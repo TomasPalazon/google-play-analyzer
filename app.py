@@ -306,9 +306,8 @@ if st.session_state.df is not None:
             try:
                 score = app_details.get('score', 'N/A')
                 if isinstance(score, (int, float)):
-                    st.metric("Valoración", f"{score:.1f} ⭐")
-                else:
-                    st.metric("Valoración", "N/A")
+                    st.metric("Valoración", f"{score:.1f} ")
+                    st.metric("Valoración", f"{score:.1f} ")
                     
                 installs = app_details.get('installs', 'N/A')
                 st.write(f"Descargas: {installs}")
@@ -317,13 +316,13 @@ if st.session_state.df is not None:
         
         # Dashboard con pestañas
         tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-            "📊 Estadísticas Generales", 
-            "☁️ Nube de Palabras",
-            "📈 Análisis de Sentimiento",
-            "📱 Apps del Desarrollador",
-            "📋 Análisis de Temas",
-            "🔍 Comentarios",
-            "📊 Métricas de Evaluación"
+            " Estadísticas Generales", 
+            " Nube de Palabras",
+            " Análisis de Sentimiento",
+            " Apps del Desarrollador",
+            " Análisis de Temas",
+            " Comentarios",
+            " Métricas de Evaluación"
         ])
 
         with tab1:
@@ -344,7 +343,7 @@ if st.session_state.df is not None:
             
             with col2:
                 st.write("### Estadísticas")
-                st.metric("Valoración", f"{app_details.get('score', 'N/A')} ⭐")
+                st.metric("Valoración", f"{app_details.get('score', 'N/A')} ")
                 st.metric("Instalaciones", f"{app_details.get('installs', 'N/A')}")
                 st.metric("Reseñas", f"{app_details.get('reviews', 'N/A')}")
                 
@@ -364,7 +363,7 @@ if st.session_state.df is not None:
                 # Crear el DataFrame con los índices correctos
                 ratings_df = pd.DataFrame({
                     'Rating': range(1, 6),  # Índices de 1 a 5
-                    'Estrellas': ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'],
+                    'Estrellas': ['1', '2', '3', '4', '5'],
                     'Cantidad': hist_data,  # Los datos ya vienen en orden 1 a 5
                     'Porcentaje': [count/total_ratings*100 for count in hist_data]
                 })
@@ -380,11 +379,11 @@ if st.session_state.df is not None:
                 
                 # Calcular el promedio ponderado
                 weighted_avg = sum(ratings_df['Rating'] * ratings_df['Cantidad']) / total_ratings
-                st.metric("Rating Promedio", f"{weighted_avg:.2f} ⭐")
+                st.metric("Rating Promedio", f"{weighted_avg:.2f} ")
             
             # Información adicional
             st.write("### Información Detallada")
-            tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas", "📊 Gráficas"])
+            tabs_info = st.tabs([" Descripción", " Historial", " Permisos", " Etiquetas", " Gráficas"])
             
             with tabs_info[0]:
                 if 'description' in app_details:
@@ -430,7 +429,7 @@ if st.session_state.df is not None:
                                 for cat in app_details['categories'] if cat is not None]
                     for i, categoria in enumerate(sorted(categories)):
                         if categoria:  # Solo mostrar si no está vacío
-                            cols[i % 3].markdown(f"🏷️ {categoria}")
+                            cols[i % 3].markdown(f" {categoria}")
                     
                     if 'tags' in app_details and app_details['tags']:
                         st.write("#### Tags Adicionales")
@@ -450,13 +449,13 @@ if st.session_state.df is not None:
                 if 'histogram' in app_details and app_details['histogram']:
                     # Crear DataFrame con los datos del desglose
                     ratings_data = {
-                        'Estrellas': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
+                        'Estrellas': ['1', '2', '3', '4', '5'],  # Cambiado a texto plano
                         'Cantidad': [
-                            app_details['histogram'][4],
-                            app_details['histogram'][3],
-                            app_details['histogram'][2],
-                            app_details['histogram'][1],
-                            app_details['histogram'][0]
+                            app_details['histogram'][0],  # 1 estrella
+                            app_details['histogram'][1],  # 2 estrellas
+                            app_details['histogram'][2],  # 3 estrellas
+                            app_details['histogram'][3],  # 4 estrellas
+                            app_details['histogram'][4]   # 5 estrellas
                         ]
                     }
                     df_ratings = pd.DataFrame(ratings_data)
@@ -465,7 +464,7 @@ if st.session_state.df is not None:
                     
                     # Crear gráfica de barras
                     fig, ax = plt.subplots(figsize=(12, 6))
-                    bars = ax.bar(df_ratings['Estrellas'], df_ratings['Cantidad'], color='#1f77b4')
+                    bars = ax.bar(df_ratings['Estrellas'], df_ratings['Cantidad'], color='gold')
                     
                     # Añadir etiquetas con cantidad y porcentaje
                     for bar in bars:
@@ -548,7 +547,7 @@ if st.session_state.df is not None:
             st.subheader("Análisis de Palabras")
             
             # Pestañas para diferentes análisis de texto
-            word_tabs = st.tabs(["☁️ Nube de Palabras", "📊 Unigramas", "📈 Bigramas", "📉 Trigramas"])
+            word_tabs = st.tabs([" Nube de Palabras", " Unigramas", " Bigramas", " Trigramas"])
             
             with word_tabs[0]:
                 col1, col2 = st.columns(2)
@@ -740,9 +739,8 @@ if st.session_state.df is not None:
                         try:
                             score = app.get('score')
                             if score is not None:
-                                st.metric("Valoración", f"{score:.1f} ⭐")
-                            else:
-                                st.metric("Valoración", "N/A")
+                                st.metric("Valoración", f"{score:.1f} ")
+                                st.metric("Valoración", f"{score:.1f} ")
                             
                             installs = app.get('installs', 'N/A')
                             st.write(f"Descargas: {installs}")
