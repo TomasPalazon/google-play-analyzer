@@ -212,8 +212,17 @@ if st.session_state.df is not None:
             st.subheader(app_details['title'])
             st.write(f"Desarrollador: {app_details['developer']}")
         with col3:
-            st.metric("Valoración", f"{app_details['score']:.1f} ⭐")
-            st.write(f"Descargas: {app_details['installs']}")
+            try:
+                score = app_details.get('score', 'N/A')
+                if isinstance(score, (int, float)):
+                    st.metric("Valoración", f"{score:.1f} ⭐")
+                else:
+                    st.metric("Valoración", "N/A")
+                    
+                installs = app_details.get('installs', 'N/A')
+                st.write(f"Descargas: {installs}")
+            except Exception as e:
+                st.error("Error al cargar los detalles de la app")
         
         # Dashboard con pestañas
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
