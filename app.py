@@ -245,7 +245,7 @@ if st.session_state.df is not None:
             st.subheader("Información General de la App")
             
             # Información básica
-            col1, col2, col3 = st.columns([2,1,1])
+            col1, col2 = st.columns([2,1])
             with col1:
                 st.write("### Detalles Principales")
                 st.write(f"**Nombre:** {app_details['title']}")
@@ -269,21 +269,35 @@ if st.session_state.df is not None:
                     last_update = datetime.fromtimestamp(app_details['updated'])
                     days_since_update = (datetime.now() - last_update).days
                     st.metric("Última actualización", f"Hace {days_since_update} días")
+
+            # Desglose de ratings debajo de detalles principales
+            if 'histogram' in app_details and app_details['histogram']:
+                st.write("### Desglose de Ratings")
+                hist_data = app_details['histogram']
+                total_ratings = sum(hist_data)
+                
+                ratings_df = pd.DataFrame({
+                    'Rating': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
+                    'Cantidad': hist_data[::-1],
+                    'Porcentaje': [count/total_ratings*100 for count in hist_data[::-1]]
+                })
+                
+                st.dataframe(ratings_df.style.format({
+                    'Cantidad': '{:,.0f}',
+                    'Porcentaje': '{:.1f}%'
+                }))
+                
+                weighted_avg = sum((5-i)*count for i, count in enumerate(hist_data)) / total_ratings
+                st.metric("Rating Promedio", f"{weighted_avg:.2f} ⭐")
             
-            with col3:
+            # Información adicional
+            st.write("### Información Detallada")
+            tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas", "📊 Gráficas"])
+            
+            with tabs_info[4]:
                 st.write("### Distribución de Ratings")
                 if 'histogram' in app_details and app_details['histogram']:
-                    hist_data = app_details['histogram']
-                    total_ratings = sum(hist_data)
-                    
-                    # Crear DataFrame para mejor visualización
-                    ratings_df = pd.DataFrame({
-                        'Rating': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
-                        'Cantidad': hist_data,  
-                        'Porcentaje': [count/total_ratings*100 for count in hist_data]
-                    })
-                    
-                    # Crear gráfico de barras
+                    # Gráfico de distribución de ratings
                     fig, ax = plt.subplots(figsize=(10, 6))
                     bars = ax.bar(ratings_df['Rating'], ratings_df['Cantidad'])
                     
@@ -298,75 +312,7 @@ if st.session_state.df is not None:
                     plt.xlabel('Valoración')
                     plt.ylabel('Cantidad de reseñas')
                     st.pyplot(fig)
-                    
-                    # Mostrar tabla con estadísticas
-                    st.write("#### Desglose de Ratings")
-                    st.dataframe(ratings_df.style.format({
-                        'Cantidad': '{:,.0f}',
-                        'Porcentaje': '{:.1f}%'
-                    }))
-                    
-                    # Añadir rating promedio
-                    weighted_avg = sum((i+1)*count for i, count in enumerate(hist_data)) / total_ratings
-                    st.metric("Rating Promedio", f"{weighted_avg:.2f} ⭐")
-                else:
-                    st.write("No hay datos de ratings disponibles")
-            
-            # Información adicional
-            st.write("### Información Detallada")
-            tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas", "📊 Análisis"])
-            
-            with tabs_info[0]:
-                if 'description' in app_details:
-                    st.markdown(app_details['description'])
-                else:
-                    st.write("Descripción no disponible")
-            
-            with tabs_info[1]:
-                if 'recentChanges' in app_details:
-                    st.write("#### Últimos Cambios")
-                    st.markdown(app_details['recentChanges'])
-                else:
-                    st.write("Historial de cambios no disponible")
-            
-            with tabs_info[2]:
-                if 'permissions' in app_details:
-                    permisos = app_details['permissions']
-                    st.write(f"Total de permisos requeridos: {len(permisos)}")
-                    
-                    # Agrupar permisos por categoría
-                    categorias_permisos = {}
-                    for permiso in permisos:
-                        categoria = permiso.split('.')[2] if len(permiso.split('.')) > 2 else "OTROS"
-                        if categoria not in categorias_permisos:
-                            categorias_permisos[categoria] = []
-                        categorias_permisos[categoria].append(permiso)
-                    
-                    # Mostrar permisos por categoría
-                    for categoria, permisos_list in categorias_permisos.items():
-                        with st.expander(f"{categoria} ({len(permisos_list)})"):
-                            for permiso in permisos_list:
-                                st.write(f"- {permiso}")
-                else:
-                    st.write("Información de permisos no disponible")
-            
-            with tabs_info[3]:
-                if 'categories' in app_details:
-                    st.write("#### Categorías y Etiquetas")
-                    # Mostrar como chips/tags
-                    cols = st.columns(3)
-                    for i, categoria in enumerate(app_details['categories']):
-                        cols[i % 3].markdown(f"🏷️ {categoria}")
-                    
-                    if 'tags' in app_details:
-                        st.write("#### Tags Adicionales")
-                        cols = st.columns(3)
-                        for i, tag in enumerate(app_details['tags']):
-                            cols[i % 3].markdown(f"#️⃣ {tag}")
-                else:
-                    st.write("Información de categorías no disponible")
-            
-            with tabs_info[4]:
+                
                 if len(df) > 0:
                     st.write("### Análisis de Sentimiento vs Rating")
                     
@@ -639,58 +585,84 @@ if st.session_state.df is not None:
         with tab5:
             st.subheader("Análisis de Temas")
             
-            # Configuración del modelo LDA
-            num_topics = st.slider("Número de temas a identificar", 2, 10, 4)
-            
-            try:
-                # Crear el diccionario y el corpus
-                texts = [text.split() for text in df['processed_content'].dropna()]
-                dictionary = corpora.Dictionary(texts)
-                corpus = [dictionary.doc2bow(text) for text in texts]
+            if len(df) > 0:
+                # Definir categorías de temas comunes
+                temas_categorias = {
+                    'Rendimiento': ['lento', 'congela', 'lag', 'crash', 'cierra', 'freezes', 'cuelga', 'pesada', 'rendimiento'],
+                    'Publicidad': ['anuncios', 'ads', 'publicidad', 'propaganda', 'pop-up', 'popup'],
+                    'Interfaz': ['interfaz', 'diseño', 'ui', 'ux', 'usuario', 'menú', 'botones', 'navegación'],
+                    'Funcionalidad': ['funciona', 'feature', 'característica', 'opción', 'herramienta'],
+                    'Errores': ['error', 'bug', 'fallo', 'problema', 'no funciona', 'arreglen'],
+                    'Actualizaciones': ['actualización', 'update', 'versión', 'nueva versión'],
+                    'Contenido': ['contenido', 'información', 'datos', 'material'],
+                    'Precio': ['precio', 'pago', 'gratis', 'premium', 'compra', 'costo'],
+                    'Soporte': ['soporte', 'ayuda', 'atención', 'respuesta', 'servicio'],
+                    'Permisos': ['permiso', 'acceso', 'privacidad', 'datos personales']
+                }
                 
-                # Entrenar el modelo LDA
-                lda_model = LdaModel(
-                    corpus=corpus,
-                    id2word=dictionary,
-                    num_topics=num_topics,
-                    random_state=42,
-                    passes=10
-                )
+                # Función para clasificar comentarios
+                def clasificar_comentario(texto):
+                    texto = texto.lower()
+                    categorias = []
+                    for categoria, keywords in temas_categorias.items():
+                        if any(keyword in texto for keyword in keywords):
+                            categorias.append(categoria)
+                    return categorias if categorias else ['Otros']
                 
-                # Mostrar los temas identificados
-                st.write("### Temas Identificados")
-                for idx, topic in lda_model.print_topics():
-                    st.write(f"**Tema {idx + 1}:**")
-                    # Extraer y mostrar las palabras más relevantes
-                    words = topic.split("+")
-                    for word in words:
-                        weight = float(word.split("*")[0])
-                        term = word.split("*")[1].strip().replace('"', '')
-                        st.write(f"- {term}: {weight:.3f}")
-                    st.write("---")
+                # Clasificar comentarios
+                df['temas'] = df['content'].apply(clasificar_comentario)
                 
-                # Visualizar la distribución de temas
-                doc_topics = [lda_model[doc] for doc in corpus]
-                topic_weights = [[0] * num_topics for _ in range(len(doc_topics))]
-                for i, doc_topic in enumerate(doc_topics):
-                    for topic_id, weight in doc_topic:
-                        topic_weights[i][topic_id] = weight
+                # Expandir la lista de temas
+                todos_temas = []
+                for temas in df['temas']:
+                    todos_temas.extend(temas)
                 
-                topic_weights_df = pd.DataFrame(topic_weights)
-                topic_weights_df.columns = [f"Tema {i+1}" for i in range(num_topics)]
+                # Contar frecuencia de temas
+                tema_counts = pd.Series(todos_temas).value_counts()
                 
-                st.write("### Distribución de Temas")
-                fig, ax = plt.subplots(figsize=(10, 6))
-                topic_weights_df.mean().plot(kind='bar')
-                plt.title("Distribución Promedio de Temas")
-                plt.xlabel("Temas")
-                plt.ylabel("Peso Promedio")
+                # Visualizar distribución de temas
+                fig, ax = plt.subplots(figsize=(12, 6))
+                tema_counts.plot(kind='bar')
+                plt.title('Distribución de Temas en Comentarios')
+                plt.xlabel('Tema')
+                plt.ylabel('Número de Comentarios')
                 plt.xticks(rotation=45)
                 st.pyplot(fig)
-                plt.close()
                 
-            except Exception as e:
-                st.error(f"Error en el análisis de temas: {str(e)}")
+                # Mostrar ejemplos de cada tema
+                st.write("### Ejemplos de Comentarios por Tema")
+                for tema in tema_counts.index:
+                    with st.expander(f"{tema} ({tema_counts[tema]} comentarios)"):
+                        # Obtener comentarios de este tema
+                        comentarios_tema = df[df['temas'].apply(lambda x: tema in x)]
+                        # Mostrar los 3 comentarios más relevantes (basados en likes o longitud)
+                        if 'thumbsUpCount' in comentarios_tema.columns:
+                            ejemplos = comentarios_tema.nlargest(3, 'thumbsUpCount')
+                        else:
+                            ejemplos = comentarios_tema.sample(min(3, len(comentarios_tema)))
+                        
+                        for _, comentario in ejemplos.iterrows():
+                            st.write(f"- {comentario['content']}")
+                            if 'score' in comentario:
+                                st.write(f"   Rating: {'⭐' * int(comentario['score'])}")
+                
+                # Análisis de sentimiento por tema
+                st.write("### Sentimiento por Tema")
+                sentimiento_tema = {}
+                for tema in tema_counts.index:
+                    comentarios_tema = df[df['temas'].apply(lambda x: tema in x)]
+                    sentimiento_tema[tema] = comentarios_tema['sentiment_score'].mean()
+                
+                # Visualizar sentimiento por tema
+                sentimiento_df = pd.DataFrame.from_dict(sentimiento_tema, orient='index', columns=['Sentimiento'])
+                fig, ax = plt.subplots(figsize=(12, 6))
+                colors = ['red' if x < 0 else 'green' for x in sentimiento_df['Sentimiento']]
+                sentimiento_df['Sentimiento'].plot(kind='bar', color=colors)
+                plt.title('Sentimiento Promedio por Tema')
+                plt.xlabel('Tema')
+                plt.ylabel('Sentimiento (-1 a 1)')
+                plt.xticks(rotation=45)
+                st.pyplot(fig)
 
         with tab6:
             # Tabla de comentarios
@@ -752,125 +724,112 @@ if st.session_state.df is not None:
         with tab7:
             st.subheader("Métricas de Evaluación")
             
-            # Preparar datos
             if len(df) > 0:
-                # Calcular puntuaciones VADER si no existen
-                if 'content' in df.columns:
-                    analyzer = SentimentIntensityAnalyzer()
-                    vader_scores = df['content'].apply(lambda x: analyzer.polarity_scores(str(x)))
-                    
-                    df['Compound_VADER'] = vader_scores.apply(lambda x: x['compound'])
-                    df['Positive_VADER'] = vader_scores.apply(lambda x: x['pos'])
-                    df['Negative_VADER'] = vader_scores.apply(lambda x: x['neg'])
-                    df['Neutral_VADER'] = vader_scores.apply(lambda x: x['neu'])
-                
-                # Asegurarse de que existe la columna Score y convertirla a numérica
+                # Preparar datos para el modelo
+                features = ['sentiment_score']
                 if 'score' in df.columns:
-                    df['Score'] = pd.to_numeric(df['score'], errors='coerce')
+                    df['score_norm'] = df['score'] / 5.0  # Normalizar scores
+                    features.append('score_norm')
                 
-                # Crear etiquetas de sentimiento basadas en el score
-                df['sentiment'] = df['Score'].apply(lambda x: 
-                    2 if x >= 4 else (0 if x <= 2 else 1))
+                # Crear etiquetas basadas en el score
+                df['sentiment_class'] = pd.qcut(df['sentiment_score'], 
+                                             q=3, 
+                                             labels=['Negativo', 'Neutral', 'Positivo'])
                 
-                # Seleccionar características disponibles
-                all_features = ['Compound_VADER', 'Negative_VADER', 'Neutral_VADER', 'Positive_VADER', 'Score']
-                available_features = [f for f in all_features if f in df.columns]
+                # Preparar X e y
+                X = df[features]
+                y = df['sentiment_class']
                 
-                if len(available_features) > 0:
-                    X = df[available_features].fillna(0)  # Manejar valores NaN
-                    y = df['sentiment']
+                # Dividir datos
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                
+                # Entrenar modelos
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("### Modelo SVM")
                     
-                    # Dividir datos en entrenamiento y prueba
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                    # Entrenar SVM
+                    svm_model = svm.SVC(kernel='rbf', probability=True)
+                    svm_model.fit(X_train, y_train)
                     
-                    # Entrenar modelos
-                    col1, col2 = st.columns(2)
+                    # Predicciones
+                    y_pred_svm = svm_model.predict(X_test)
                     
-                    with col1:
-                        st.write("### Modelo SVM")
-                        
-                        # Entrenar SVM
-                        svm_model = svm.SVC(kernel='rbf', probability=True)
-                        svm_model.fit(X_train, y_train)
-                        
-                        # Predicciones
-                        y_pred_svm = svm_model.predict(X_test)
-                        y_scores_svm = svm_model.decision_function(X_test)
-                        
-                        # Métricas
-                        report = classification_report(y_test, y_pred_svm, output_dict=True)
-                        
-                        # Mostrar métricas en formato de tabla
-                        metrics_df = pd.DataFrame({
-                            'Precisión': [report['0']['precision'], report['1']['precision'], report['2']['precision']],
-                            'Recall': [report['0']['recall'], report['1']['recall'], report['2']['recall']],
-                            'F1-Score': [report['0']['f1-score'], report['1']['f1-score'], report['2']['f1-score']]
-                        }, index=['Positivo', 'Negativo', 'Neutral'])
-                        
-                        st.dataframe(metrics_df.style.format("{:.3f}"))
-                        
-                        # Matriz de confusión
-                        cm = confusion_matrix(y_test, y_pred_svm)
-                        fig, ax = plt.subplots(figsize=(8, 6))
-                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                                   xticklabels=['Positivo', 'Negativo', 'Neutral'],
-                                   yticklabels=['Positivo', 'Negativo', 'Neutral'])
-                        plt.title('Matriz de Confusión - SVM')
-                        plt.xlabel('Predicción')
-                        plt.ylabel('Real')
-                        st.pyplot(fig)
+                    # Métricas
+                    report = classification_report(y_test, y_pred_svm, output_dict=True)
                     
-                    with col2:
-                        st.write("### Modelo Random Forest")
-                        
-                        # Entrenar Random Forest
-                        rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
-                        rf_model.fit(X_train, y_train)
-                        
-                        # Predicciones
-                        y_pred_rf = rf_model.predict(X_test)
-                        y_proba_rf = rf_model.predict_proba(X_test)
-                        
-                        # Métricas
-                        report_rf = classification_report(y_test, y_pred_rf, output_dict=True)
-                        
-                        # Mostrar métricas en formato de tabla
-                        metrics_df_rf = pd.DataFrame({
-                            'Precisión': [report_rf['0']['precision'], report_rf['1']['precision'], report_rf['2']['precision']],
-                            'Recall': [report_rf['0']['recall'], report_rf['1']['recall'], report_rf['2']['recall']],
-                            'F1-Score': [report_rf['0']['f1-score'], report_rf['1']['f1-score'], report_rf['2']['f1-score']]
-                        }, index=['Positivo', 'Negativo', 'Neutral'])
-                        
-                        st.dataframe(metrics_df_rf.style.format("{:.3f}"))
-                        
-                        # Importancia de características
-                        feature_importance = pd.DataFrame({
-                            'Característica': available_features,
-                            'Importancia': rf_model.feature_importances_
-                        }).sort_values('Importancia', ascending=False)
-                        
-                        fig, ax = plt.subplots(figsize=(8, 6))
-                        sns.barplot(data=feature_importance, x='Importancia', y='Característica')
-                        plt.title('Importancia de Características - Random Forest')
-                        st.pyplot(fig)
+                    # Mostrar métricas en formato de tabla
+                    metrics_df = pd.DataFrame({
+                        'Precisión': [report[label]['precision'] for label in ['Negativo', 'Neutral', 'Positivo']],
+                        'Recall': [report[label]['recall'] for label in ['Negativo', 'Neutral', 'Positivo']],
+                        'F1-Score': [report[label]['f1-score'] for label in ['Negativo', 'Neutral', 'Positivo']]
+                    }, index=['Negativo', 'Neutral', 'Positivo'])
                     
-                    # Métricas adicionales
-                    st.write("### Métricas Adicionales")
-                    col1, col2, col3 = st.columns(3)
+                    st.dataframe(metrics_df.style.format("{:.3f}"))
                     
-                    with col1:
-                        # Cross-validation score para SVM
-                        cv_scores_svm = cross_val_score(svm_model, X, y, cv=5)
-                        st.metric("CV Score (SVM)", f"{cv_scores_svm.mean():.3f} ± {cv_scores_svm.std():.3f}")
+                    # Matriz de confusión
+                    cm = confusion_matrix(y_test, y_pred_svm)
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                              xticklabels=['Negativo', 'Neutral', 'Positivo'],
+                              yticklabels=['Negativo', 'Neutral', 'Positivo'])
+                    plt.title('Matriz de Confusión - SVM')
+                    plt.xlabel('Predicción')
+                    plt.ylabel('Real')
+                    st.pyplot(fig)
+                
+                with col2:
+                    st.write("### Modelo Random Forest")
                     
-                    with col2:
-                        # Cross-validation score para RF
-                        cv_scores_rf = cross_val_score(rf_model, X, y, cv=5)
-                        st.metric("CV Score (RF)", f"{cv_scores_rf.mean():.3f} ± {cv_scores_rf.std():.3f}")
+                    # Entrenar Random Forest
+                    rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+                    rf_model.fit(X_train, y_train)
                     
-                    with col3:
-                        # Comparación de accuracy
-                        acc_svm = accuracy_score(y_test, y_pred_svm)
-                        acc_rf = accuracy_score(y_test, y_pred_rf)
-                        st.metric("Mejor Modelo", "SVM" if acc_svm > acc_rf else "Random Forest",
-                                 f"Accuracy: {max(acc_svm, acc_rf):.3f}")
+                    # Predicciones
+                    y_pred_rf = rf_model.predict(X_test)
+                    
+                    # Métricas
+                    report_rf = classification_report(y_test, y_pred_rf, output_dict=True)
+                    
+                    # Mostrar métricas en formato de tabla
+                    metrics_df_rf = pd.DataFrame({
+                        'Precisión': [report_rf[label]['precision'] for label in ['Negativo', 'Neutral', 'Positivo']],
+                        'Recall': [report_rf[label]['recall'] for label in ['Negativo', 'Neutral', 'Positivo']],
+                        'F1-Score': [report_rf[label]['f1-score'] for label in ['Negativo', 'Neutral', 'Positivo']]
+                    }, index=['Negativo', 'Neutral', 'Positivo'])
+                    
+                    st.dataframe(metrics_df_rf.style.format("{:.3f}"))
+                    
+                    # Importancia de características
+                    feature_importance = pd.DataFrame({
+                        'Característica': features,
+                        'Importancia': rf_model.feature_importances_
+                    }).sort_values('Importancia', ascending=False)
+                    
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.barplot(data=feature_importance, x='Importancia', y='Característica')
+                    plt.title('Importancia de Características - Random Forest')
+                    st.pyplot(fig)
+                
+                # Métricas adicionales
+                st.write("### Métricas Adicionales")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # Cross-validation score para SVM
+                    cv_scores_svm = cross_val_score(svm_model, X, y, cv=5)
+                    st.metric("CV Score (SVM)", f"{cv_scores_svm.mean():.3f} ± {cv_scores_svm.std():.3f}")
+                
+                with col2:
+                    # Cross-validation score para RF
+                    cv_scores_rf = cross_val_score(rf_model, X, y, cv=5)
+                    st.metric("CV Score (RF)", f"{cv_scores_rf.mean():.3f} ± {cv_scores_rf.std():.3f}")
+                
+                with col3:
+                    # Comparación de accuracy
+                    acc_svm = accuracy_score(y_test, y_pred_svm)
+                    acc_rf = accuracy_score(y_test, y_pred_rf)
+                    st.metric("Mejor Modelo", 
+                             "SVM" if acc_svm > acc_rf else "Random Forest",
+                             f"Accuracy: {max(acc_svm, acc_rf):.3f}")
