@@ -99,8 +99,9 @@ def preprocess_comment(comment_text):
 
 # Función para analizar sentimiento
 def analyze_sentiment(text):
-    analyzer = SentimentIntensityAnalyzer()
-    return analyzer.polarity_scores(text)['compound']
+    """Analiza el sentimiento de un texto usando VADER con léxico actualizado"""
+    scores = sentiment_analyzer.polarity_scores(text)
+    return scores['compound']
 
 # Función para clasificar sentimiento
 def classify_sentiment(compound_score):
@@ -161,70 +162,90 @@ def get_apps_by_developer(app_id, num_results=10):
         st.error(f"Error al obtener apps del desarrollador: {str(e)}")
         return []
 
-# Función para actualizar el léxico de VADER con expresiones comunes de juegos y jerga moderna
+# Función para actualizar el léxico de VADER con expresiones modernas, jerga de internet y términos específicos de gaming
 def update_vader_lexicon():
-    analyzer = SentimentIntensityAnalyzer()
-    
-    # Expresiones de juegos y apps
+    """Actualiza el léxico de VADER con expresiones modernas y de gaming"""
     new_words = {
-        'fun as hell': 3.0,
-        'good game': 2.0,
-        'great game': 3.0,
+        # Expresiones de gaming positivas
+        'fun as hell': 4.0,
+        'good game': 3.0,
+        'great game': 4.0,
         'best game': 4.0,
-        'addictive': 2.0,
-        'addicting': 2.0,
-        'awesome game': 3.0,
-        'cool game': 2.0,
-        'love this game': 4.0,
-        'amazing game': 3.0,
+        'awesome game': 4.0,
+        'addictive': 3.0,
+        'addicting': 3.0,
+        'worth it': 3.0,
+        'worth the money': 3.5,
+        'worth every penny': 4.0,
         
-        # Jerga de internet positiva
-        'lit': 2.0,
-        'fire': 2.0,
-        'dope': 2.0,
-        'sick': 2.0,  # En contexto moderno es positivo
-        'goated': 3.0,
-        'based': 2.0,
-        'poggers': 3.0,
-        'pog': 2.0,
+        # Jerga moderna positiva
+        'goated': 4.0,
+        'fire': 3.5,
+        'lit': 3.5,
+        'bussin': 3.5,
+        'valid': 2.5,
+        'clean': 2.5,
+        'based': 3.0,
+        'poggers': 4.0,
+        'pog': 3.5,
+        'w game': 3.5,
+        'big w': 3.5,
+        'huge w': 4.0,
+        'no cap': 2.0,
+        'hits different': 3.0,
+        'slaps': 3.5,
+        'goes hard': 3.5,
         
-        # Expresiones de juegos negativas
-        'pay to win': -2.0,
-        'paywall': -2.0,
-        'cash grab': -3.0,
-        'broken game': -3.0,
-        'unplayable': -3.0,
-        'lag': -1.0,
-        'lags': -1.0,
-        'laggy': -2.0,
-        'buggy': -2.0,
-        'crashes': -2.0,
-        'freezes': -2.0,
+        # Modificadores positivos
+        'as hell': 1.5,
+        'af': 1.5,
+        'asf': 1.5,
+        'fr': 1.0,
+        'frfr': 1.5,
+        'ong': 1.0,
+        'ngl': 0.5,
         
-        # Modificadores
-        'as hell': 1.0,
-        'af': 1.0,
+        # Expresiones de gaming negativas
+        'pay to win': -3.5,
+        'p2w': -3.0,
+        'paywall': -3.0,
+        'cash grab': -3.5,
+        'money grab': -3.5,
+        'broken game': -3.5,
+        'trash game': -3.5,
+        'garbage game': -3.5,
+        'waste of time': -3.5,
+        'waste of money': -3.5,
+        'not worth': -3.0,
+        'unplayable': -3.5,
+        'unbalanced': -2.5,
+        'rigged': -3.0,
         
-        # Publicidad
-        'too many ads': -2.0,
-        'full of ads': -2.0,
-        'ads everywhere': -2.0,
+        # Jerga moderna negativa
+        'mid': -2.0,
+        'L game': -3.0,
+        'big l': -3.0,
+        'huge l': -3.5,
+        'dead game': -3.0,
+        'skill issue': -2.0,
+        'ratio': -2.0,
+        'scam': -3.5,
+        
+        # Expresiones sobre anuncios
+        'too many ads': -3.0,
+        'full of ads': -3.0,
+        'ads everywhere': -3.0,
         'ad spam': -3.0,
-        
-        # Otros
-        'rip off': -3.0,
-        'ripoff': -3.0,
-        'waste of time': -3.0,
-        'waste of money': -3.0,
-        'not worth': -2.0,
+        'ad simulator': -3.0
     }
     
-    # Actualizar el léxico
+    # Actualizar el léxico de VADER
+    analyzer = SentimentIntensityAnalyzer()
     analyzer.lexicon.update(new_words)
     return analyzer
 
-# Actualizar el analizador VADER con el nuevo léxico
-vader_analyzer = update_vader_lexicon()
+# Crear instancia de VADER con léxico actualizado
+sentiment_analyzer = update_vader_lexicon()
 
 # Input para la URL de la app (centrado)
 col1, col2, col3 = st.columns([1,2,1])
@@ -246,7 +267,7 @@ with col2:
                     df['processed_content'] = df['content'].apply(preprocess_comment)
                     
                     # Análisis de sentimiento
-                    df['sentiment_scores'] = df['content'].apply(vader_analyzer.polarity_scores)
+                    df['sentiment_scores'] = df['content'].apply(sentiment_analyzer.polarity_scores)
                     df['sentiment_score'] = df['sentiment_scores'].apply(lambda x: x['compound'])
                     df['sentiment'] = df['sentiment_score'].apply(classify_sentiment)
                     
@@ -427,42 +448,39 @@ if st.session_state.df is not None:
             with tabs_info[4]:
                 # Distribución de Ratings
                 if 'histogram' in app_details and app_details['histogram']:
-                    # Usar el mismo DataFrame que ya tenemos ordenado
+                    # Crear DataFrame con los datos del desglose
+                    ratings_data = {
+                        'Estrellas': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
+                        'Cantidad': [
+                            app_details['histogram'][4],
+                            app_details['histogram'][3],
+                            app_details['histogram'][2],
+                            app_details['histogram'][1],
+                            app_details['histogram'][0]
+                        ]
+                    }
+                    df_ratings = pd.DataFrame(ratings_data)
+                    total_ratings = df_ratings['Cantidad'].sum()
+                    df_ratings['Porcentaje'] = (df_ratings['Cantidad'] / total_ratings * 100).round(1)
+                    
+                    # Crear gráfica de barras
                     fig, ax = plt.subplots(figsize=(12, 6))
+                    bars = ax.bar(df_ratings['Estrellas'], df_ratings['Cantidad'], color='#1f77b4')
                     
-                    # Crear barras usando los datos ordenados del DataFrame
-                    bars = ax.bar(
-                        range(len(ratings_df)), 
-                        ratings_df['Cantidad'],
-                        color='gold'  # Color dorado para las barras
-                    )
-                    
-                    # Personalizar el eje X para mostrar las estrellas
-                    plt.xticks(
-                        range(len(ratings_df)),
-                        ratings_df['Estrellas'],
-                        rotation=0
-                    )
-                    
-                    # Añadir etiquetas con el número exacto y porcentaje
-                    for i, bar in enumerate(bars):
+                    # Añadir etiquetas con cantidad y porcentaje
+                    for bar in bars:
                         height = bar.get_height()
-                        ax.text(
-                            bar.get_x() + bar.get_width()/2.,
-                            height,
-                            f'{ratings_df["Cantidad"].iloc[i]:,.0f}\n({ratings_df["Porcentaje"].iloc[i]:.1f}%)',
-                            ha='center',
-                            va='bottom'
-                        )
+                        percentage = (height / total_ratings * 100).round(1)
+                        ax.text(bar.get_x() + bar.get_width()/2, height,
+                               f'{int(height):,}\n({percentage}%)',
+                               ha='center', va='bottom')
                     
-                    plt.title('Distribución de Ratings', pad=20)
-                    plt.xlabel('Valoración')
-                    plt.ylabel('Cantidad de reseñas')
-                    
-                    # Ajustar márgenes
-                    plt.tight_layout()
-                    
+                    plt.title('Distribución de Ratings')
+                    plt.xlabel('Rating')
+                    plt.ylabel('Número de Usuarios')
+                    plt.grid(True, alpha=0.3)
                     st.pyplot(fig)
+                    plt.close()
                 
                 if len(df) > 0:
                     st.write("### Análisis de Sentimiento vs Rating")
@@ -470,7 +488,7 @@ if st.session_state.df is not None:
                     # Calcular sentimiento si no existe
                     if 'sentiment_score' not in df.columns:
                         df['sentiment_score'] = df['content'].apply(
-                            lambda x: vader_analyzer.polarity_scores(str(x))['compound']
+                            lambda x: sentiment_analyzer.polarity_scores(str(x))['compound']
                         )
                     
                     # Gráfico de densidad
