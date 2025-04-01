@@ -251,7 +251,7 @@ if st.session_state.df is not None:
                 st.write(f"**Nombre:** {app_details['title']}")
                 st.write(f"**Desarrollador:** {app_details['developer']}")
                 st.write(f"**Categoría:** {app_details['genre']}")
-                st.write(f"**Precio:** {'Gratis' if app_details['free'] else f'{app_details['price']}'}")
+                st.write(f"**Precio:** {'Gratis' if app_details['free'] else app_details['price']}")
                 st.write(f"**Versión:** {app_details['version']}")
                 st.write(f"**Tamaño:** {app_details.get('size', 'No disponible')}")
                 st.write(f"**Android requerido:** {app_details.get('androidVersion', 'No especificado')}")
