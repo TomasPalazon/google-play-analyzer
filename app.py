@@ -276,18 +276,25 @@ if st.session_state.df is not None:
                 hist_data = app_details['histogram']
                 total_ratings = sum(hist_data)
                 
+                # Crear el DataFrame con los índices correctos
                 ratings_df = pd.DataFrame({
-                    'Rating': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
-                    'Cantidad': hist_data[::-1],
-                    'Porcentaje': [count/total_ratings*100 for count in hist_data[::-1]]
+                    'Rating': range(1, 6),  # Índices de 1 a 5
+                    'Estrellas': ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'],
+                    'Cantidad': hist_data,  # Los datos ya vienen en orden 1 a 5
+                    'Porcentaje': [count/total_ratings*100 for count in hist_data]
                 })
                 
+                # Ordenar de 5 a 1 estrellas para la visualización
+                ratings_df = ratings_df.sort_values('Rating', ascending=False).reset_index(drop=True)
+                
                 st.dataframe(ratings_df.style.format({
+                    'Rating': '{:.0f}',
                     'Cantidad': '{:,.0f}',
                     'Porcentaje': '{:.1f}%'
                 }))
                 
-                weighted_avg = sum((5-i)*count for i, count in enumerate(hist_data)) / total_ratings
+                # Calcular el promedio ponderado
+                weighted_avg = sum(ratings_df['Rating'] * ratings_df['Cantidad']) / total_ratings
                 st.metric("Rating Promedio", f"{weighted_avg:.2f} ⭐")
             
             # Información adicional
@@ -299,7 +306,7 @@ if st.session_state.df is not None:
                 if 'histogram' in app_details and app_details['histogram']:
                     # Gráfico de distribución de ratings
                     fig, ax = plt.subplots(figsize=(10, 6))
-                    bars = ax.bar(ratings_df['Rating'], ratings_df['Cantidad'])
+                    bars = ax.bar(ratings_df['Estrellas'], ratings_df['Cantidad'])
                     
                     # Añadir porcentajes sobre las barras
                     for i, bar in enumerate(bars):
