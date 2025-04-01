@@ -400,18 +400,26 @@ if st.session_state.df is not None:
                     st.write("Información de permisos no disponible")
             
             with tabs_info[3]:
-                if 'categories' in app_details:
+                if 'categories' in app_details and app_details['categories']:
                     st.write("#### Categorías")
                     # Mostrar como chips/tags
                     cols = st.columns(3)
-                    for i, categoria in enumerate(sorted(app_details['categories'])):
-                        cols[i % 3].markdown(f"🏷️ {categoria}")
+                    # Asegurarse de que estamos trabajando con strings
+                    categories = [str(cat) if isinstance(cat, (str, int, float)) else cat.get('name', '') 
+                                for cat in app_details['categories'] if cat is not None]
+                    for i, categoria in enumerate(sorted(categories)):
+                        if categoria:  # Solo mostrar si no está vacío
+                            cols[i % 3].markdown(f"🏷️ {categoria}")
                     
-                    if 'tags' in app_details:
+                    if 'tags' in app_details and app_details['tags']:
                         st.write("#### Tags Adicionales")
                         cols = st.columns(3)
-                        for i, tag in enumerate(sorted(app_details['tags'])):
-                            cols[i % 3].markdown(f"#️⃣ {tag}")
+                        # Asegurarse de que estamos trabajando con strings
+                        tags = [str(tag) if isinstance(tag, (str, int, float)) else tag.get('name', '')
+                               for tag in app_details['tags'] if tag is not None]
+                        for i, tag in enumerate(sorted(tags)):
+                            if tag:  # Solo mostrar si no está vacío
+                                cols[i % 3].markdown(f"#️⃣ {tag}")
                 else:
                     st.write("Información de categorías no disponible")
             
