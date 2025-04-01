@@ -497,41 +497,58 @@ if st.session_state.df is not None:
                 st.error(f"Error en el análisis de temas: {str(e)}")
 
         with tab6:
-            st.subheader("Comentarios y Análisis de Sentimiento")
+            # Tabla de comentarios
+            st.subheader("Comentarios y Análisis")
             
-            # Opciones de ordenamiento
-            sort_option = st.selectbox(
-                "Ordenar comentarios por:",
-                ["Más recientes", "Mayor puntuación de sentimiento", "Menor puntuación de sentimiento", "Mayor puntuación", "Menor puntuación"]
+            # Filtros
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                sentiment_filter = st.selectbox(
+                    "Filtrar por sentimiento",
+                    ["Todos", "Positivos", "Negativos", "Neutros"]
+                )
+            with col2:
+                min_rating = st.selectbox("Valoración mínima", [1,2,3,4,5])
+            with col3:
+                sort_by = st.selectbox(
+                    "Ordenar por",
+                    ["Más recientes", "Mejor valorados", "Peor valorados", "Más positivos", "Más negativos"]
+                )
+            
+            # Aplicar filtros
+            filtered_df = df.copy()
+            if sentiment_filter == "Positivos":
+                filtered_df = filtered_df[filtered_df['sentiment_score'] > 0.05]
+            elif sentiment_filter == "Negativos":
+                filtered_df = filtered_df[filtered_df['sentiment_score'] < -0.05]
+            elif sentiment_filter == "Neutros":
+                filtered_df = filtered_df[(filtered_df['sentiment_score'] >= -0.05) & (filtered_df['sentiment_score'] <= 0.05)]
+            
+            filtered_df = filtered_df[filtered_df['score'] >= min_rating]
+            
+            # Ordenar
+            if sort_by == "Más recientes":
+                filtered_df = filtered_df.sort_values('at', ascending=False)
+            elif sort_by == "Mejor valorados":
+                filtered_df = filtered_df.sort_values('score', ascending=False)
+            elif sort_by == "Peor valorados":
+                filtered_df = filtered_df.sort_values('score', ascending=True)
+            elif sort_by == "Más positivos":
+                filtered_df = filtered_df.sort_values('sentiment_score', ascending=False)
+            elif sort_by == "Más negativos":
+                filtered_df = filtered_df.sort_values('sentiment_score', ascending=True)
+            
+            # Mostrar tabla con formato mejorado
+            st.dataframe(
+                filtered_df[['content', 'score', 'sentiment', 'sentiment_score', 'at']].rename(columns={
+                    'content': 'Comentario',
+                    'score': 'Valoración',
+                    'sentiment': 'Sentimiento',
+                    'sentiment_score': 'Puntuación Sentimiento',
+                    'at': 'Fecha'
+                }).style.format({
+                    'Puntuación Sentimiento': '{:.2f}',
+                    'Fecha': lambda x: x.strftime('%Y-%m-%d')
+                }),
+                height=400
             )
-            
-            # Ordenar DataFrame según la opción seleccionada
-            if sort_option == "Más recientes":
-                df_display = df.sort_values('at', ascending=False)
-            elif sort_option == "Mayor puntuación de sentimiento":
-                df_display = df.sort_values('sentiment_score', ascending=False)
-            elif sort_option == "Menor puntuación de sentimiento":
-                df_display = df.sort_values('sentiment_score', ascending=True)
-            elif sort_option == "Mayor puntuación":
-                df_display = df.sort_values('score', ascending=False)
-            else:  # Menor puntuación
-                df_display = df.sort_values('score', ascending=True)
-            
-            # Mostrar comentarios con formato mejorado
-            for _, row in df_display.iterrows():
-                with st.container():
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.markdown(f"**Comentario:** {row['content']}")
-                        st.markdown(f"**Fecha:** {row['at'].strftime('%Y-%m-%d')}")
-                    with col2:
-                        st.markdown(f"**Puntuación:** {row['score']}/5")
-                        # Colorear el sentimiento según su valor
-                        sentiment_color = (
-                            "🟢" if row['sentiment'] == 'Positivo' 
-                            else "🔴" if row['sentiment'] == 'Negativo' 
-                            else "⚪"
-                        )
-                        st.markdown(f"**Sentimiento:** {sentiment_color} {row['sentiment']}")
-                        st.markdown(f"**Score VADER:** {row['sentiment_score']:.2f}")
-                    st.markdown("---")
