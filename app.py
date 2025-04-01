@@ -17,6 +17,12 @@ from sklearn.feature_extraction.text import CountVectorizer
 from tqdm.auto import tqdm
 import warnings
 warnings.filterwarnings('ignore')
+from sklearn.model_selection import train_test_split
+from sklearn import svm
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+import sklearn
 
 # Descargar recursos de NLTK necesarios
 import nltk
@@ -225,68 +231,141 @@ if st.session_state.df is not None:
                 st.error("Error al cargar los detalles de la app")
         
         # Dashboard con pestañas
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "📊 Estadísticas Generales", 
             "☁️ Nube de Palabras",
             "📈 Análisis de Sentimiento",
             "📱 Apps del Desarrollador",
             "📋 Análisis de Temas",
-            "🔍 Comentarios"
+            "🔍 Comentarios",
+            "📊 Métricas de Evaluación"
         ])
 
         with tab1:
-            # Información básica de la app
-            st.subheader("Información Detallada de la App")
-            col1, col2 = st.columns(2)
+            st.subheader("Información General de la App")
             
+            # Información básica
+            col1, col2, col3 = st.columns([2,1,1])
             with col1:
-                st.write("**Estadísticas de Comentarios**")
-                total_comments = len(df)
-                positive_comments = len(df[df['sentiment_score'] > 0.05])
-                negative_comments = len(df[df['sentiment_score'] < -0.05])
-                neutral_comments = total_comments - positive_comments - negative_comments
-                
-                st.metric("Total de comentarios", total_comments)
-                st.metric("Comentarios positivos", f"{positive_comments} ({(positive_comments/total_comments)*100:.1f}%)")
-                st.metric("Comentarios negativos", f"{negative_comments} ({(negative_comments/total_comments)*100:.1f}%)")
-                st.metric("Comentarios neutros", f"{neutral_comments} ({(neutral_comments/total_comments)*100:.1f}%)")
+                st.write("### Detalles Principales")
+                st.write(f"**Nombre:** {app_details['title']}")
+                st.write(f"**Desarrollador:** {app_details['developer']}")
+                st.write(f"**Categoría:** {app_details['genre']}")
+                st.write(f"**Precio:** {'Gratis' if app_details['free'] else f'{app_details['price']}'}")
+                st.write(f"**Versión:** {app_details['version']}")
+                st.write(f"**Tamaño:** {app_details.get('size', 'No disponible')}")
+                st.write(f"**Android requerido:** {app_details.get('androidVersion', 'No especificado')}")
+                st.write(f"**Contenido para:** {app_details.get('contentRating', 'No especificado')}")
             
             with col2:
-                # Distribución de valoraciones
-                st.write("**Distribución de Valoraciones**")
-                fig, ax = plt.subplots(figsize=(10, 6))
-                df['score'].value_counts().sort_index().plot(kind='bar')
-                plt.title("Distribución de Valoraciones")
-                plt.xlabel("Estrellas")
-                plt.ylabel("Número de reseñas")
-                st.pyplot(fig)
-                plt.close()
-
-            # Evolución temporal del sentimiento
-            st.subheader("Evolución del Sentimiento")
-            df['date'] = pd.to_datetime(df['at'])
-            sentiment_by_date = df.groupby(df['date'].dt.date)['sentiment_score'].mean()
+                st.write("### Estadísticas")
+                st.metric("Valoración", f"{app_details.get('score', 'N/A')} ⭐")
+                st.metric("Instalaciones", f"{app_details.get('installs', 'N/A')}")
+                st.metric("Reseñas", f"{app_details.get('reviews', 'N/A')}")
+                
+                # Calcular tiempo desde última actualización
+                if 'updated' in app_details:
+                    from datetime import datetime
+                    last_update = datetime.fromtimestamp(app_details['updated'])
+                    days_since_update = (datetime.now() - last_update).days
+                    st.metric("Última actualización", f"Hace {days_since_update} días")
             
-            fig = plt.figure(figsize=(12, 6))
-            plt.plot(sentiment_by_date.index, sentiment_by_date.values, marker='o')
-            plt.title("Evolución del Sentimiento a lo largo del tiempo")
-            plt.xlabel("Fecha")
-            plt.ylabel("Puntuación de Sentimiento")
-            plt.grid(True)
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
-            plt.close()
-
-            # Discrepancia entre Sentimiento y Score
-            st.subheader("Relación entre Sentimiento y Valoración")
-            fig = plt.figure(figsize=(10, 6))
-            sns.kdeplot(data=df, x='sentiment_score', y='score', cmap="Blues", fill=True)
-            plt.title('Discrepancia entre el Sentimiento y la Valoración')
-            plt.xlabel('Sentimiento (VADER)')
-            plt.ylabel('Valoración')
-            plt.grid(True)
-            st.pyplot(fig)
-            plt.close()
+            with col3:
+                st.write("### Distribución de Ratings")
+                if 'histogram' in app_details:
+                    hist_data = app_details['histogram']
+                    fig, ax = plt.subplots(figsize=(6, 4))
+                    bars = ax.bar(range(1, 6), hist_data[::-1])
+                    
+                    # Añadir porcentajes sobre las barras
+                    total = sum(hist_data)
+                    for i, bar in enumerate(bars):
+                        height = bar.get_height()
+                        percentage = (height/total) * 100
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                               f'{percentage:.1f}%',
+                               ha='center', va='bottom')
+                    
+                    plt.title('Distribución de Ratings')
+                    plt.xlabel('Estrellas')
+                    plt.ylabel('Cantidad')
+                    st.pyplot(fig)
+            
+            # Información adicional
+            st.write("### Información Detallada")
+            tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas"])
+            
+            with tabs_info[0]:
+                if 'description' in app_details:
+                    st.markdown(app_details['description'])
+                else:
+                    st.write("Descripción no disponible")
+            
+            with tabs_info[1]:
+                if 'recentChanges' in app_details:
+                    st.write("#### Últimos Cambios")
+                    st.markdown(app_details['recentChanges'])
+                else:
+                    st.write("Historial de cambios no disponible")
+            
+            with tabs_info[2]:
+                if 'permissions' in app_details:
+                    permisos = app_details['permissions']
+                    st.write(f"Total de permisos requeridos: {len(permisos)}")
+                    
+                    # Agrupar permisos por categoría
+                    categorias_permisos = {}
+                    for permiso in permisos:
+                        categoria = permiso.split('.')[2] if len(permiso.split('.')) > 2 else "OTROS"
+                        if categoria not in categorias_permisos:
+                            categorias_permisos[categoria] = []
+                        categorias_permisos[categoria].append(permiso)
+                    
+                    # Mostrar permisos por categoría
+                    for categoria, permisos_list in categorias_permisos.items():
+                        with st.expander(f"{categoria} ({len(permisos_list)})"):
+                            for permiso in permisos_list:
+                                st.write(f"- {permiso}")
+                else:
+                    st.write("Información de permisos no disponible")
+            
+            with tabs_info[3]:
+                if 'categories' in app_details:
+                    st.write("#### Categorías y Etiquetas")
+                    # Mostrar como chips/tags
+                    cols = st.columns(3)
+                    for i, categoria in enumerate(app_details['categories']):
+                        cols[i % 3].markdown(f"🏷️ {categoria}")
+                    
+                    if 'tags' in app_details:
+                        st.write("#### Tags Adicionales")
+                        cols = st.columns(3)
+                        for i, tag in enumerate(app_details['tags']):
+                            cols[i % 3].markdown(f"#️⃣ {tag}")
+                else:
+                    st.write("Información de categorías no disponible")
+            
+            # Métricas de crecimiento
+            st.write("### Métricas de Crecimiento")
+            growth_cols = st.columns(4)
+            
+            # Calcular métricas de crecimiento si es posible
+            if len(df) > 0:
+                with growth_cols[0]:
+                    reviews_last_month = len(df[df['at'] >= (pd.Timestamp.now() - pd.DateOffset(months=1))])
+                    st.metric("Reseñas último mes", reviews_last_month)
+                
+                with growth_cols[1]:
+                    avg_rating_recent = df[df['at'] >= (pd.Timestamp.now() - pd.DateOffset(months=1))]['score'].mean()
+                    st.metric("Rating promedio reciente", f"{avg_rating_recent:.2f}")
+                
+                with growth_cols[2]:
+                    sentiment_recent = df[df['at'] >= (pd.Timestamp.now() - pd.DateOffset(months=1))]['sentiment_score'].mean()
+                    st.metric("Sentimiento reciente", f"{sentiment_recent:.2f}")
+                
+                with growth_cols[3]:
+                    response_rate = len(df[df['repliedAt'].notna()]) / len(df) * 100
+                    st.metric("Tasa de respuesta", f"{response_rate:.1f}%")
 
         with tab2:
             # Nube de palabras y N-gramas
@@ -386,33 +465,88 @@ if st.session_state.df is not None:
                 plt.close()
 
         with tab3:
-            st.subheader("Análisis Detallado del Sentimiento")
+            st.subheader("Evolución del Sentimiento")
+            
+            # Selector de rango de fechas
             col1, col2 = st.columns(2)
-            
             with col1:
-                # Boxplot de sentimiento por valoración
-                st.write("**Distribución de Sentimiento por Valoración**")
-                fig, ax = plt.subplots(figsize=(10, 6))
-                sns.boxplot(data=df, x='score', y='sentiment_score')
-                plt.title("Distribución de Sentimiento por Valoración")
-                plt.xlabel("Valoración (estrellas)")
-                plt.ylabel("Puntuación de Sentimiento")
-                st.pyplot(fig)
-                plt.close()
-            
+                start_date = st.date_input(
+                    "Fecha inicial",
+                    min_value=df['at'].min().date(),
+                    max_value=df['at'].max().date(),
+                    value=df['at'].min().date()
+                )
             with col2:
-                # Mostrar comentarios más positivos y negativos
-                st.write("**Comentarios Destacados**")
-                most_positive = df.nlargest(3, 'sentiment_score')[['content', 'sentiment_score', 'score']]
-                most_negative = df.nsmallest(3, 'sentiment_score')[['content', 'sentiment_score', 'score']]
+                end_date = st.date_input(
+                    "Fecha final",
+                    min_value=df['at'].min().date(),
+                    max_value=df['at'].max().date(),
+                    value=df['at'].max().date()
+                )
+            
+            # Filtrar por rango de fechas
+            mask = (df['at'].dt.date >= start_date) & (df['at'].dt.date <= end_date)
+            df_filtered = df[mask].copy()
+            
+            if not df_filtered.empty:
+                # Agrupar por fecha y calcular promedio de sentimiento
+                sentiment_by_date = df_filtered.groupby(df_filtered['at'].dt.date)['sentiment_score'].mean().reset_index()
                 
-                st.write("🌟 Comentarios más positivos:")
-                for _, row in most_positive.iterrows():
-                    st.info(f"'{row['content']}'\nSentimiento: {row['sentiment_score']:.2f} | ⭐: {row['score']}")
+                # Calcular línea de tendencia
+                X = np.arange(len(sentiment_by_date)).reshape(-1, 1)
+                y = sentiment_by_date['sentiment_score'].values
                 
-                st.write("👎 Comentarios más negativos:")
-                for _, row in most_negative.iterrows():
-                    st.error(f"'{row['content']}'\nSentimiento: {row['sentiment_score']:.2f} | ⭐: {row['score']}")
+                from sklearn.linear_model import LinearRegression
+                reg = LinearRegression().fit(X, y)
+                trend_line = reg.predict(X)
+                
+                # Calcular R² y ecuación de la recta
+                r2 = reg.score(X, y)
+                slope = reg.coef_[0]
+                intercept = reg.intercept_
+                equation = f'y = {slope:.4f}x + {intercept:.4f}'
+                
+                # Crear gráfico
+                fig, ax = plt.subplots(figsize=(10, 6))
+                
+                # Gráfico de dispersión
+                ax.scatter(sentiment_by_date['at'], sentiment_by_date['sentiment_score'], 
+                         alpha=0.5, color='blue', label='Sentimiento diario')
+                
+                # Línea de tendencia
+                ax.plot(sentiment_by_date['at'], trend_line, 
+                       color='red', linestyle='--', 
+                       label=f'Tendencia (R² = {r2:.3f})')
+                
+                # Personalización del gráfico
+                ax.set_xlabel('Fecha')
+                ax.set_ylabel('Puntuación de Sentimiento')
+                ax.grid(True, alpha=0.3)
+                
+                # Rotar etiquetas del eje x
+                plt.xticks(rotation=45)
+                
+                # Añadir ecuación de la recta
+                ax.text(0.05, 0.95, equation, 
+                       transform=ax.transAxes, 
+                       bbox=dict(facecolor='white', alpha=0.8),
+                       verticalalignment='top')
+                
+                # Ajustar layout y mostrar
+                plt.tight_layout()
+                st.pyplot(fig)
+                
+                # Estadísticas adicionales
+                st.write("### Estadísticas del período seleccionado")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Sentimiento promedio", f"{sentiment_by_date['sentiment_score'].mean():.2f}")
+                with col2:
+                    st.metric("Tendencia", "Positiva" if slope > 0 else "Negativa")
+                with col3:
+                    st.metric("R²", f"{r2:.3f}")
+            else:
+                st.warning("No hay datos para el rango de fechas seleccionado")
 
         with tab4:
             st.subheader("Otras Apps del Desarrollador")
@@ -552,3 +686,106 @@ if st.session_state.df is not None:
                 }),
                 height=400
             )
+
+        with tab7:
+            st.subheader("Métricas de Evaluación")
+            
+            # Preparar datos
+            features = ['Compound_VADER', 'Negative_VADER', 'Neutral_VADER', 'Positive_VADER', 'Score']
+            X = df[features]
+            y = df['Sentiment']
+            
+            # Dividir datos en entrenamiento y prueba
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            # Entrenar modelos
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("### Modelo SVM")
+                
+                # Entrenar SVM
+                svm_model = svm.SVC(kernel='rbf', probability=True)
+                svm_model.fit(X_train, y_train)
+                
+                # Predicciones
+                y_pred_svm = svm_model.predict(X_test)
+                y_scores_svm = svm_model.decision_function(X_test)
+                
+                # Métricas
+                report = classification_report(y_test, y_pred_svm, output_dict=True)
+                
+                # Mostrar métricas en formato de tabla
+                metrics_df = pd.DataFrame({
+                    'Precisión': [report['0']['precision'], report['1']['precision'], report['2']['precision']],
+                    'Recall': [report['0']['recall'], report['1']['recall'], report['2']['recall']],
+                    'F1-Score': [report['0']['f1-score'], report['1']['f1-score'], report['2']['f1-score']]
+                }, index=['Positivo', 'Negativo', 'Neutral'])
+                
+                st.dataframe(metrics_df.style.format("{:.3f}"))
+                
+                # Matriz de confusión
+                cm = confusion_matrix(y_test, y_pred_svm)
+                fig, ax = plt.subplots(figsize=(8, 6))
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                           xticklabels=['Positivo', 'Negativo', 'Neutral'],
+                           yticklabels=['Positivo', 'Negativo', 'Neutral'])
+                plt.title('Matriz de Confusión - SVM')
+                plt.xlabel('Predicción')
+                plt.ylabel('Real')
+                st.pyplot(fig)
+            
+            with col2:
+                st.write("### Modelo Random Forest")
+                
+                # Entrenar Random Forest
+                rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+                rf_model.fit(X_train, y_train)
+                
+                # Predicciones
+                y_pred_rf = rf_model.predict(X_test)
+                y_proba_rf = rf_model.predict_proba(X_test)
+                
+                # Métricas
+                report_rf = classification_report(y_test, y_pred_rf, output_dict=True)
+                
+                # Mostrar métricas en formato de tabla
+                metrics_df_rf = pd.DataFrame({
+                    'Precisión': [report_rf['0']['precision'], report_rf['1']['precision'], report_rf['2']['precision']],
+                    'Recall': [report_rf['0']['recall'], report_rf['1']['recall'], report_rf['2']['recall']],
+                    'F1-Score': [report_rf['0']['f1-score'], report_rf['1']['f1-score'], report_rf['2']['f1-score']]
+                }, index=['Positivo', 'Negativo', 'Neutral'])
+                
+                st.dataframe(metrics_df_rf.style.format("{:.3f}"))
+                
+                # Importancia de características
+                feature_importance = pd.DataFrame({
+                    'Característica': features,
+                    'Importancia': rf_model.feature_importances_
+                }).sort_values('Importancia', ascending=False)
+                
+                fig, ax = plt.subplots(figsize=(8, 6))
+                sns.barplot(data=feature_importance, x='Importancia', y='Característica')
+                plt.title('Importancia de Características - Random Forest')
+                st.pyplot(fig)
+            
+            # Métricas adicionales
+            st.write("### Métricas Adicionales")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Cross-validation score para SVM
+                cv_scores_svm = cross_val_score(svm_model, X, y, cv=5)
+                st.metric("CV Score (SVM)", f"{cv_scores_svm.mean():.3f} ± {cv_scores_svm.std():.3f}")
+            
+            with col2:
+                # Cross-validation score para RF
+                cv_scores_rf = cross_val_score(rf_model, X, y, cv=5)
+                st.metric("CV Score (RF)", f"{cv_scores_rf.mean():.3f} ± {cv_scores_rf.std():.3f}")
+            
+            with col3:
+                # Comparación de accuracy
+                acc_svm = accuracy_score(y_test, y_pred_svm)
+                acc_rf = accuracy_score(y_test, y_pred_rf)
+                st.metric("Mejor Modelo", "SVM" if acc_svm > acc_rf else "Random Forest",
+                         f"Accuracy: {max(acc_svm, acc_rf):.3f}")
