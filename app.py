@@ -272,24 +272,41 @@ if st.session_state.df is not None:
             
             with col3:
                 st.write("### Distribución de Ratings")
-                if 'histogram' in app_details:
+                if 'histogram' in app_details and app_details['histogram']:
                     hist_data = app_details['histogram']
-                    fig, ax = plt.subplots(figsize=(6, 4))
-                    bars = ax.bar(range(1, 6), hist_data[::-1])
+                    total_ratings = sum(hist_data)
+                    
+                    # Crear DataFrame para mejor visualización
+                    ratings_df = pd.DataFrame({
+                        'Rating': ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'],
+                        'Cantidad': hist_data[::-1],  # Invertir para mostrar 5 estrellas primero
+                        'Porcentaje': [count/total_ratings*100 for count in hist_data[::-1]]
+                    })
+                    
+                    # Crear gráfico de barras
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    bars = ax.bar(ratings_df['Rating'], ratings_df['Cantidad'])
                     
                     # Añadir porcentajes sobre las barras
-                    total = sum(hist_data)
                     for i, bar in enumerate(bars):
                         height = bar.get_height()
-                        percentage = (height/total) * 100
                         ax.text(bar.get_x() + bar.get_width()/2., height,
-                               f'{percentage:.1f}%',
+                               f'{ratings_df["Porcentaje"][i]:.1f}%',
                                ha='center', va='bottom')
                     
                     plt.title('Distribución de Ratings')
-                    plt.xlabel('Estrellas')
-                    plt.ylabel('Cantidad')
+                    plt.xlabel('Valoración')
+                    plt.ylabel('Cantidad de reseñas')
                     st.pyplot(fig)
+                    
+                    # Mostrar tabla con estadísticas
+                    st.write("#### Desglose de Ratings")
+                    st.dataframe(ratings_df.style.format({
+                        'Cantidad': '{:,.0f}',
+                        'Porcentaje': '{:.1f}%'
+                    }))
+                else:
+                    st.write("No hay datos de ratings disponibles")
             
             # Información adicional
             st.write("### Información Detallada")
@@ -691,101 +708,124 @@ if st.session_state.df is not None:
             st.subheader("Métricas de Evaluación")
             
             # Preparar datos
-            features = ['Compound_VADER', 'Negative_VADER', 'Neutral_VADER', 'Positive_VADER', 'Score']
-            X = df[features]
-            y = df['Sentiment']
-            
-            # Dividir datos en entrenamiento y prueba
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            
-            # Entrenar modelos
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.write("### Modelo SVM")
+            if len(df) > 0:
+                # Calcular puntuaciones VADER si no existen
+                if 'content' in df.columns:
+                    analyzer = SentimentIntensityAnalyzer()
+                    vader_scores = df['content'].apply(lambda x: analyzer.polarity_scores(str(x)))
+                    
+                    df['Compound_VADER'] = vader_scores.apply(lambda x: x['compound'])
+                    df['Positive_VADER'] = vader_scores.apply(lambda x: x['pos'])
+                    df['Negative_VADER'] = vader_scores.apply(lambda x: x['neg'])
+                    df['Neutral_VADER'] = vader_scores.apply(lambda x: x['neu'])
                 
-                # Entrenar SVM
-                svm_model = svm.SVC(kernel='rbf', probability=True)
-                svm_model.fit(X_train, y_train)
+                # Asegurarse de que existe la columna Score y convertirla a numérica
+                if 'score' in df.columns:
+                    df['Score'] = pd.to_numeric(df['score'], errors='coerce')
                 
-                # Predicciones
-                y_pred_svm = svm_model.predict(X_test)
-                y_scores_svm = svm_model.decision_function(X_test)
+                # Crear etiquetas de sentimiento basadas en el score
+                df['sentiment'] = df['Score'].apply(lambda x: 
+                    2 if x >= 4 else (0 if x <= 2 else 1))
                 
-                # Métricas
-                report = classification_report(y_test, y_pred_svm, output_dict=True)
+                # Seleccionar características disponibles
+                all_features = ['Compound_VADER', 'Negative_VADER', 'Neutral_VADER', 'Positive_VADER', 'Score']
+                available_features = [f for f in all_features if f in df.columns]
                 
-                # Mostrar métricas en formato de tabla
-                metrics_df = pd.DataFrame({
-                    'Precisión': [report['0']['precision'], report['1']['precision'], report['2']['precision']],
-                    'Recall': [report['0']['recall'], report['1']['recall'], report['2']['recall']],
-                    'F1-Score': [report['0']['f1-score'], report['1']['f1-score'], report['2']['f1-score']]
-                }, index=['Positivo', 'Negativo', 'Neutral'])
-                
-                st.dataframe(metrics_df.style.format("{:.3f}"))
-                
-                # Matriz de confusión
-                cm = confusion_matrix(y_test, y_pred_svm)
-                fig, ax = plt.subplots(figsize=(8, 6))
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                           xticklabels=['Positivo', 'Negativo', 'Neutral'],
-                           yticklabels=['Positivo', 'Negativo', 'Neutral'])
-                plt.title('Matriz de Confusión - SVM')
-                plt.xlabel('Predicción')
-                plt.ylabel('Real')
-                st.pyplot(fig)
-            
-            with col2:
-                st.write("### Modelo Random Forest")
-                
-                # Entrenar Random Forest
-                rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
-                rf_model.fit(X_train, y_train)
-                
-                # Predicciones
-                y_pred_rf = rf_model.predict(X_test)
-                y_proba_rf = rf_model.predict_proba(X_test)
-                
-                # Métricas
-                report_rf = classification_report(y_test, y_pred_rf, output_dict=True)
-                
-                # Mostrar métricas en formato de tabla
-                metrics_df_rf = pd.DataFrame({
-                    'Precisión': [report_rf['0']['precision'], report_rf['1']['precision'], report_rf['2']['precision']],
-                    'Recall': [report_rf['0']['recall'], report_rf['1']['recall'], report_rf['2']['recall']],
-                    'F1-Score': [report_rf['0']['f1-score'], report_rf['1']['f1-score'], report_rf['2']['f1-score']]
-                }, index=['Positivo', 'Negativo', 'Neutral'])
-                
-                st.dataframe(metrics_df_rf.style.format("{:.3f}"))
-                
-                # Importancia de características
-                feature_importance = pd.DataFrame({
-                    'Característica': features,
-                    'Importancia': rf_model.feature_importances_
-                }).sort_values('Importancia', ascending=False)
-                
-                fig, ax = plt.subplots(figsize=(8, 6))
-                sns.barplot(data=feature_importance, x='Importancia', y='Característica')
-                plt.title('Importancia de Características - Random Forest')
-                st.pyplot(fig)
-            
-            # Métricas adicionales
-            st.write("### Métricas Adicionales")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                # Cross-validation score para SVM
-                cv_scores_svm = cross_val_score(svm_model, X, y, cv=5)
-                st.metric("CV Score (SVM)", f"{cv_scores_svm.mean():.3f} ± {cv_scores_svm.std():.3f}")
-            
-            with col2:
-                # Cross-validation score para RF
-                cv_scores_rf = cross_val_score(rf_model, X, y, cv=5)
-                st.metric("CV Score (RF)", f"{cv_scores_rf.mean():.3f} ± {cv_scores_rf.std():.3f}")
-            
-            with col3:
-                # Comparación de accuracy
-                acc_svm = accuracy_score(y_test, y_pred_svm)
-                acc_rf = accuracy_score(y_test, y_pred_rf)
-                st.metric("Mejor Modelo", "SVM" if acc_svm > acc_rf else "Random Forest",
-                         f"Accuracy: {max(acc_svm, acc_rf):.3f}")
+                if len(available_features) > 0:
+                    X = df[available_features].fillna(0)  # Manejar valores NaN
+                    y = df['sentiment']
+                    
+                    # Dividir datos en entrenamiento y prueba
+                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                    
+                    # Entrenar modelos
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("### Modelo SVM")
+                        
+                        # Entrenar SVM
+                        svm_model = svm.SVC(kernel='rbf', probability=True)
+                        svm_model.fit(X_train, y_train)
+                        
+                        # Predicciones
+                        y_pred_svm = svm_model.predict(X_test)
+                        y_scores_svm = svm_model.decision_function(X_test)
+                        
+                        # Métricas
+                        report = classification_report(y_test, y_pred_svm, output_dict=True)
+                        
+                        # Mostrar métricas en formato de tabla
+                        metrics_df = pd.DataFrame({
+                            'Precisión': [report['0']['precision'], report['1']['precision'], report['2']['precision']],
+                            'Recall': [report['0']['recall'], report['1']['recall'], report['2']['recall']],
+                            'F1-Score': [report['0']['f1-score'], report['1']['f1-score'], report['2']['f1-score']]
+                        }, index=['Positivo', 'Negativo', 'Neutral'])
+                        
+                        st.dataframe(metrics_df.style.format("{:.3f}"))
+                        
+                        # Matriz de confusión
+                        cm = confusion_matrix(y_test, y_pred_svm)
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                                   xticklabels=['Positivo', 'Negativo', 'Neutral'],
+                                   yticklabels=['Positivo', 'Negativo', 'Neutral'])
+                        plt.title('Matriz de Confusión - SVM')
+                        plt.xlabel('Predicción')
+                        plt.ylabel('Real')
+                        st.pyplot(fig)
+                    
+                    with col2:
+                        st.write("### Modelo Random Forest")
+                        
+                        # Entrenar Random Forest
+                        rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+                        rf_model.fit(X_train, y_train)
+                        
+                        # Predicciones
+                        y_pred_rf = rf_model.predict(X_test)
+                        y_proba_rf = rf_model.predict_proba(X_test)
+                        
+                        # Métricas
+                        report_rf = classification_report(y_test, y_pred_rf, output_dict=True)
+                        
+                        # Mostrar métricas en formato de tabla
+                        metrics_df_rf = pd.DataFrame({
+                            'Precisión': [report_rf['0']['precision'], report_rf['1']['precision'], report_rf['2']['precision']],
+                            'Recall': [report_rf['0']['recall'], report_rf['1']['recall'], report_rf['2']['recall']],
+                            'F1-Score': [report_rf['0']['f1-score'], report_rf['1']['f1-score'], report_rf['2']['f1-score']]
+                        }, index=['Positivo', 'Negativo', 'Neutral'])
+                        
+                        st.dataframe(metrics_df_rf.style.format("{:.3f}"))
+                        
+                        # Importancia de características
+                        feature_importance = pd.DataFrame({
+                            'Característica': available_features,
+                            'Importancia': rf_model.feature_importances_
+                        }).sort_values('Importancia', ascending=False)
+                        
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        sns.barplot(data=feature_importance, x='Importancia', y='Característica')
+                        plt.title('Importancia de Características - Random Forest')
+                        st.pyplot(fig)
+                    
+                    # Métricas adicionales
+                    st.write("### Métricas Adicionales")
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        # Cross-validation score para SVM
+                        cv_scores_svm = cross_val_score(svm_model, X, y, cv=5)
+                        st.metric("CV Score (SVM)", f"{cv_scores_svm.mean():.3f} ± {cv_scores_svm.std():.3f}")
+                    
+                    with col2:
+                        # Cross-validation score para RF
+                        cv_scores_rf = cross_val_score(rf_model, X, y, cv=5)
+                        st.metric("CV Score (RF)", f"{cv_scores_rf.mean():.3f} ± {cv_scores_rf.std():.3f}")
+                    
+                    with col3:
+                        # Comparación de accuracy
+                        acc_svm = accuracy_score(y_test, y_pred_svm)
+                        acc_rf = accuracy_score(y_test, y_pred_rf)
+                        st.metric("Mejor Modelo", "SVM" if acc_svm > acc_rf else "Random Forest",
+                                 f"Accuracy: {max(acc_svm, acc_rf):.3f}")
