@@ -306,9 +306,10 @@ if st.session_state.df is not None:
             try:
                 score = app_details.get('score', 'N/A')
                 if isinstance(score, (int, float)):
-                    st.metric("Valoración", f"{score:.1f} ")
-                    st.metric("Valoración", f"{score:.1f} ")
-                    
+                    st.metric("Valoración", f"{score:.1f} ⭐")
+                else:
+                    st.metric("Valoración", "N/A")
+                
                 installs = app_details.get('installs', 'N/A')
                 st.write(f"Descargas: {installs}")
             except Exception as e:
@@ -316,13 +317,13 @@ if st.session_state.df is not None:
         
         # Dashboard con pestañas
         tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-            " Estadísticas Generales", 
-            " Nube de Palabras",
-            " Análisis de Sentimiento",
-            " Apps del Desarrollador",
-            " Análisis de Temas",
-            " Comentarios",
-            " Métricas de Evaluación"
+            "📊 Estadísticas Generales", 
+            "☁️ Nube de Palabras",
+            "📈 Análisis de Sentimiento",
+            "📱 Apps del Desarrollador",
+            "📋 Análisis de Temas",
+            "🔍 Comentarios",
+            "📊 Métricas de Evaluación"
         ])
 
         with tab1:
@@ -343,7 +344,7 @@ if st.session_state.df is not None:
             
             with col2:
                 st.write("### Estadísticas")
-                st.metric("Valoración", f"{app_details.get('score', 'N/A')} ")
+                st.metric("Valoración", f"{app_details.get('score', 'N/A')} ⭐")
                 st.metric("Instalaciones", f"{app_details.get('installs', 'N/A')}")
                 st.metric("Reseñas", f"{app_details.get('reviews', 'N/A')}")
                 
@@ -363,7 +364,7 @@ if st.session_state.df is not None:
                 # Crear el DataFrame con los índices correctos
                 ratings_df = pd.DataFrame({
                     'Rating': range(1, 6),  # Índices de 1 a 5
-                    'Estrellas': ['1', '2', '3', '4', '5'],
+                    'Estrellas': ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'],
                     'Cantidad': hist_data,  # Los datos ya vienen en orden 1 a 5
                     'Porcentaje': [count/total_ratings*100 for count in hist_data]
                 })
@@ -379,7 +380,7 @@ if st.session_state.df is not None:
                 
                 # Calcular el promedio ponderado
                 weighted_avg = sum(ratings_df['Rating'] * ratings_df['Cantidad']) / total_ratings
-                st.metric("Rating Promedio", f"{weighted_avg:.2f} ")
+                st.metric("Rating Promedio", f"{weighted_avg:.2f} ⭐")
             
             # Información adicional
             st.write("### Información Detallada")
@@ -739,8 +740,9 @@ if st.session_state.df is not None:
                         try:
                             score = app.get('score')
                             if score is not None:
-                                st.metric("Valoración", f"{score:.1f} ")
-                                st.metric("Valoración", f"{score:.1f} ")
+                                st.metric("Valoración", f"{score:.1f} ⭐")
+                            else:
+                                st.metric("Valoración", "N/A")
                             
                             installs = app.get('installs', 'N/A')
                             st.write(f"Descargas: {installs}")
