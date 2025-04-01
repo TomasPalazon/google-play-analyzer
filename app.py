@@ -427,8 +427,17 @@ if st.session_state.df is not None:
                         st.write(f"**{app['title']}**")
                         st.write(f"Categoría: {app['genre']}")
                     with col3:
-                        st.metric("Valoración", f"{app['score']:.1f} ⭐")
-                        st.write(f"Descargas: {app['installs']}")
+                        try:
+                            score = app.get('score')
+                            if score is not None:
+                                st.metric("Valoración", f"{score:.1f} ⭐")
+                            else:
+                                st.metric("Valoración", "N/A")
+                            
+                            installs = app.get('installs', 'N/A')
+                            st.write(f"Descargas: {installs}")
+                        except Exception as e:
+                            st.error("Error al mostrar valoración")
                     st.markdown("---")
 
         with tab5:
@@ -437,86 +446,92 @@ if st.session_state.df is not None:
             # Configuración del modelo LDA
             num_topics = st.slider("Número de temas a identificar", 2, 10, 4)
             
-            if st.button("Analizar temas"):
-                with st.spinner("Analizando temas en los comentarios..."):
-                    # Preparar documentos para LDA
-                    docs = df['processed_content'].dropna().tolist()
-                    
-                    # Crear diccionario y corpus
-                    texts = [doc.split() for doc in docs]
-                    dictionary = corpora.Dictionary(texts)
-                    corpus = [dictionary.doc2bow(text) for text in texts]
-                    
-                    # Entrenar modelo LDA
-                    lda_model = LdaModel(
-                        corpus=corpus,
-                        id2word=dictionary,
-                        num_topics=num_topics,
-                        random_state=42,
-                        passes=15
-                    )
-                    
-                    # Mostrar temas
-                    for idx, topic in lda_model.print_topics(-1):
-                        st.write(f"**Tema {idx + 1}:**")
-                        # Procesar y mostrar palabras más relevantes
-                        words = topic.split('+')
-                        for word in words:
-                            weight = float(word.split('*')[0])
-                            term = word.split('*')[1].strip().replace('"', '')
-                            st.write(f"- {term}: {weight:.3f}")
-                        st.markdown("---")
+            try:
+                # Crear el diccionario y el corpus
+                texts = [text.split() for text in df['processed_content'].dropna()]
+                dictionary = corpora.Dictionary(texts)
+                corpus = [dictionary.doc2bow(text) for text in texts]
+                
+                # Entrenar el modelo LDA
+                lda_model = LdaModel(
+                    corpus=corpus,
+                    id2word=dictionary,
+                    num_topics=num_topics,
+                    random_state=42,
+                    passes=10
+                )
+                
+                # Mostrar los temas identificados
+                st.write("### Temas Identificados")
+                for idx, topic in lda_model.print_topics():
+                    st.write(f"**Tema {idx + 1}:**")
+                    # Extraer y mostrar las palabras más relevantes
+                    words = topic.split("+")
+                    for word in words:
+                        weight = float(word.split("*")[0])
+                        term = word.split("*")[1].strip().replace('"', '')
+                        st.write(f"- {term}: {weight:.3f}")
+                    st.write("---")
+                
+                # Visualizar la distribución de temas
+                doc_topics = [lda_model[doc] for doc in corpus]
+                topic_weights = [[0] * num_topics for _ in range(len(doc_topics))]
+                for i, doc_topic in enumerate(doc_topics):
+                    for topic_id, weight in doc_topic:
+                        topic_weights[i][topic_id] = weight
+                
+                topic_weights_df = pd.DataFrame(topic_weights)
+                topic_weights_df.columns = [f"Tema {i+1}" for i in range(num_topics)]
+                
+                st.write("### Distribución de Temas")
+                fig, ax = plt.subplots(figsize=(10, 6))
+                topic_weights_df.mean().plot(kind='bar')
+                plt.title("Distribución Promedio de Temas")
+                plt.xlabel("Temas")
+                plt.ylabel("Peso Promedio")
+                plt.xticks(rotation=45)
+                st.pyplot(fig)
+                plt.close()
+                
+            except Exception as e:
+                st.error(f"Error en el análisis de temas: {str(e)}")
 
         with tab6:
-            # Tabla de comentarios
-            st.subheader("Comentarios y Análisis")
+            st.subheader("Comentarios y Análisis de Sentimiento")
             
-            # Filtros
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                sentiment_filter = st.selectbox(
-                    "Filtrar por sentimiento",
-                    ["Todos", "Positivos", "Negativos", "Neutros"]
-                )
-            with col2:
-                min_rating = st.selectbox("Valoración mínima", [1,2,3,4,5])
-            with col3:
-                sort_by = st.selectbox(
-                    "Ordenar por",
-                    ["Más recientes", "Mejor valorados", "Peor valorados", "Más positivos", "Más negativos"]
-                )
-            
-            # Aplicar filtros
-            filtered_df = df.copy()
-            if sentiment_filter == "Positivos":
-                filtered_df = filtered_df[filtered_df['sentiment_score'] > 0.05]
-            elif sentiment_filter == "Negativos":
-                filtered_df = filtered_df[filtered_df['sentiment_score'] < -0.05]
-            elif sentiment_filter == "Neutros":
-                filtered_df = filtered_df[(filtered_df['sentiment_score'] >= -0.05) & (filtered_df['sentiment_score'] <= 0.05)]
-            
-            filtered_df = filtered_df[filtered_df['score'] >= min_rating]
-            
-            # Ordenar
-            if sort_by == "Más recientes":
-                filtered_df = filtered_df.sort_values('at', ascending=False)
-            elif sort_by == "Mejor valorados":
-                filtered_df = filtered_df.sort_values('score', ascending=False)
-            elif sort_by == "Peor valorados":
-                filtered_df = filtered_df.sort_values('score', ascending=True)
-            elif sort_by == "Más positivos":
-                filtered_df = filtered_df.sort_values('sentiment_score', ascending=False)
-            elif sort_by == "Más negativos":
-                filtered_df = filtered_df.sort_values('sentiment_score', ascending=True)
-            
-            # Mostrar tabla
-            st.dataframe(
-                filtered_df[['content', 'score', 'sentiment', 'sentiment_score', 'at']].rename(columns={
-                    'content': 'Comentario',
-                    'score': 'Valoración',
-                    'sentiment': 'Sentimiento',
-                    'sentiment_score': 'Puntuación Sentimiento',
-                    'at': 'Fecha'
-                }),
-                height=400
+            # Opciones de ordenamiento
+            sort_option = st.selectbox(
+                "Ordenar comentarios por:",
+                ["Más recientes", "Mayor puntuación de sentimiento", "Menor puntuación de sentimiento", "Mayor puntuación", "Menor puntuación"]
             )
+            
+            # Ordenar DataFrame según la opción seleccionada
+            if sort_option == "Más recientes":
+                df_display = df.sort_values('at', ascending=False)
+            elif sort_option == "Mayor puntuación de sentimiento":
+                df_display = df.sort_values('sentiment_score', ascending=False)
+            elif sort_option == "Menor puntuación de sentimiento":
+                df_display = df.sort_values('sentiment_score', ascending=True)
+            elif sort_option == "Mayor puntuación":
+                df_display = df.sort_values('score', ascending=False)
+            else:  # Menor puntuación
+                df_display = df.sort_values('score', ascending=True)
+            
+            # Mostrar comentarios con formato mejorado
+            for _, row in df_display.iterrows():
+                with st.container():
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.markdown(f"**Comentario:** {row['content']}")
+                        st.markdown(f"**Fecha:** {row['at'].strftime('%Y-%m-%d')}")
+                    with col2:
+                        st.markdown(f"**Puntuación:** {row['score']}/5")
+                        # Colorear el sentimiento según su valor
+                        sentiment_color = (
+                            "🟢" if row['sentiment'] == 'Positivo' 
+                            else "🔴" if row['sentiment'] == 'Negativo' 
+                            else "⚪"
+                        )
+                        st.markdown(f"**Sentimiento:** {sentiment_color} {row['sentiment']}")
+                        st.markdown(f"**Score VADER:** {row['sentiment_score']:.2f}")
+                    st.markdown("---")
