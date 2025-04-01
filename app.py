@@ -161,6 +161,71 @@ def get_apps_by_developer(app_id, num_results=10):
         st.error(f"Error al obtener apps del desarrollador: {str(e)}")
         return []
 
+# Función para actualizar el léxico de VADER con expresiones comunes de juegos y jerga moderna
+def update_vader_lexicon():
+    analyzer = SentimentIntensityAnalyzer()
+    
+    # Expresiones de juegos y apps
+    new_words = {
+        'fun as hell': 3.0,
+        'good game': 2.0,
+        'great game': 3.0,
+        'best game': 4.0,
+        'addictive': 2.0,
+        'addicting': 2.0,
+        'awesome game': 3.0,
+        'cool game': 2.0,
+        'love this game': 4.0,
+        'amazing game': 3.0,
+        
+        # Jerga de internet positiva
+        'lit': 2.0,
+        'fire': 2.0,
+        'dope': 2.0,
+        'sick': 2.0,  # En contexto moderno es positivo
+        'goated': 3.0,
+        'based': 2.0,
+        'poggers': 3.0,
+        'pog': 2.0,
+        
+        # Expresiones de juegos negativas
+        'pay to win': -2.0,
+        'paywall': -2.0,
+        'cash grab': -3.0,
+        'broken game': -3.0,
+        'unplayable': -3.0,
+        'lag': -1.0,
+        'lags': -1.0,
+        'laggy': -2.0,
+        'buggy': -2.0,
+        'crashes': -2.0,
+        'freezes': -2.0,
+        
+        # Modificadores
+        'as hell': 1.0,
+        'af': 1.0,
+        
+        # Publicidad
+        'too many ads': -2.0,
+        'full of ads': -2.0,
+        'ads everywhere': -2.0,
+        'ad spam': -3.0,
+        
+        # Otros
+        'rip off': -3.0,
+        'ripoff': -3.0,
+        'waste of time': -3.0,
+        'waste of money': -3.0,
+        'not worth': -2.0,
+    }
+    
+    # Actualizar el léxico
+    analyzer.lexicon.update(new_words)
+    return analyzer
+
+# Actualizar el analizador VADER con el nuevo léxico
+vader_analyzer = update_vader_lexicon()
+
 # Input para la URL de la app (centrado)
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
@@ -181,8 +246,7 @@ with col2:
                     df['processed_content'] = df['content'].apply(preprocess_comment)
                     
                     # Análisis de sentimiento
-                    analyzer = SentimentIntensityAnalyzer()
-                    df['sentiment_scores'] = df['content'].apply(analyzer.polarity_scores)
+                    df['sentiment_scores'] = df['content'].apply(vader_analyzer.polarity_scores)
                     df['sentiment_score'] = df['sentiment_scores'].apply(lambda x: x['compound'])
                     df['sentiment'] = df['sentiment_score'].apply(classify_sentiment)
                     
@@ -301,23 +365,95 @@ if st.session_state.df is not None:
             st.write("### Información Detallada")
             tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas", "📊 Gráficas"])
             
-            with tabs_info[4]:
-                st.write("### Distribución de Ratings")
-                if 'histogram' in app_details and app_details['histogram']:
-                    # Gráfico de distribución de ratings
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    bars = ax.bar(ratings_df['Estrellas'], ratings_df['Cantidad'])
+            with tabs_info[0]:
+                if 'description' in app_details:
+                    st.markdown(app_details['description'])
+                else:
+                    st.write("Descripción no disponible")
+            
+            with tabs_info[1]:
+                if 'recentChanges' in app_details:
+                    st.write("#### Últimos Cambios")
+                    st.markdown(app_details['recentChanges'])
+                else:
+                    st.write("Historial de cambios no disponible")
+            
+            with tabs_info[2]:
+                if 'permissions' in app_details:
+                    permisos = app_details['permissions']
+                    st.write(f"Total de permisos requeridos: {len(permisos)}")
                     
-                    # Añadir porcentajes sobre las barras
+                    # Agrupar permisos por categoría
+                    categorias_permisos = {}
+                    for permiso in permisos:
+                        categoria = permiso.split('.')[2] if len(permiso.split('.')) > 2 else "OTROS"
+                        if categoria not in categorias_permisos:
+                            categorias_permisos[categoria] = []
+                        categorias_permisos[categoria].append(permiso)
+                    
+                    # Mostrar permisos por categoría
+                    for categoria, permisos_list in sorted(categorias_permisos.items()):
+                        with st.expander(f"{categoria} ({len(permisos_list)})"):
+                            for permiso in sorted(permisos_list):
+                                st.write(f"- {permiso}")
+                else:
+                    st.write("Información de permisos no disponible")
+            
+            with tabs_info[3]:
+                if 'categories' in app_details:
+                    st.write("#### Categorías")
+                    # Mostrar como chips/tags
+                    cols = st.columns(3)
+                    for i, categoria in enumerate(sorted(app_details['categories'])):
+                        cols[i % 3].markdown(f"🏷️ {categoria}")
+                    
+                    if 'tags' in app_details:
+                        st.write("#### Tags Adicionales")
+                        cols = st.columns(3)
+                        for i, tag in enumerate(sorted(app_details['tags'])):
+                            cols[i % 3].markdown(f"#️⃣ {tag}")
+                else:
+                    st.write("Información de categorías no disponible")
+            
+            # Tab Gráficas (ya existente)
+            with tabs_info[4]:
+                # Distribución de Ratings
+                if 'histogram' in app_details and app_details['histogram']:
+                    # Usar el mismo DataFrame que ya tenemos ordenado
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    
+                    # Crear barras usando los datos ordenados del DataFrame
+                    bars = ax.bar(
+                        range(len(ratings_df)), 
+                        ratings_df['Cantidad'],
+                        color='gold'  # Color dorado para las barras
+                    )
+                    
+                    # Personalizar el eje X para mostrar las estrellas
+                    plt.xticks(
+                        range(len(ratings_df)),
+                        ratings_df['Estrellas'],
+                        rotation=0
+                    )
+                    
+                    # Añadir etiquetas con el número exacto y porcentaje
                     for i, bar in enumerate(bars):
                         height = bar.get_height()
-                        ax.text(bar.get_x() + bar.get_width()/2., height,
-                               f'{ratings_df["Porcentaje"][i]:.1f}%',
-                               ha='center', va='bottom')
+                        ax.text(
+                            bar.get_x() + bar.get_width()/2.,
+                            height,
+                            f'{ratings_df["Cantidad"].iloc[i]:,.0f}\n({ratings_df["Porcentaje"].iloc[i]:.1f}%)',
+                            ha='center',
+                            va='bottom'
+                        )
                     
-                    plt.title('Distribución de Ratings')
+                    plt.title('Distribución de Ratings', pad=20)
                     plt.xlabel('Valoración')
                     plt.ylabel('Cantidad de reseñas')
+                    
+                    # Ajustar márgenes
+                    plt.tight_layout()
+                    
                     st.pyplot(fig)
                 
                 if len(df) > 0:
@@ -325,9 +461,8 @@ if st.session_state.df is not None:
                     
                     # Calcular sentimiento si no existe
                     if 'sentiment_score' not in df.columns:
-                        analyzer = SentimentIntensityAnalyzer()
                         df['sentiment_score'] = df['content'].apply(
-                            lambda x: analyzer.polarity_scores(str(x))['compound']
+                            lambda x: vader_analyzer.polarity_scores(str(x))['compound']
                         )
                     
                     # Gráfico de densidad
