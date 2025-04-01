@@ -278,9 +278,9 @@ if st.session_state.df is not None:
                     
                     # Crear DataFrame para mejor visualización
                     ratings_df = pd.DataFrame({
-                        'Rating': ['⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'],
-                        'Cantidad': hist_data[::-1],  # Invertir para mostrar 5 estrellas primero
-                        'Porcentaje': [count/total_ratings*100 for count in hist_data[::-1]]
+                        'Rating': ['⭐⭐⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐', '⭐⭐', '⭐'],
+                        'Cantidad': hist_data,  
+                        'Porcentaje': [count/total_ratings*100 for count in hist_data]
                     })
                     
                     # Crear gráfico de barras
@@ -305,12 +305,16 @@ if st.session_state.df is not None:
                         'Cantidad': '{:,.0f}',
                         'Porcentaje': '{:.1f}%'
                     }))
+                    
+                    # Añadir rating promedio
+                    weighted_avg = sum((i+1)*count for i, count in enumerate(hist_data)) / total_ratings
+                    st.metric("Rating Promedio", f"{weighted_avg:.2f} ⭐")
                 else:
                     st.write("No hay datos de ratings disponibles")
             
             # Información adicional
             st.write("### Información Detallada")
-            tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas"])
+            tabs_info = st.tabs(["📝 Descripción", "🔄 Historial", "📱 Permisos", "🏷️ Etiquetas", "📊 Análisis"])
             
             with tabs_info[0]:
                 if 'description' in app_details:
@@ -361,6 +365,47 @@ if st.session_state.df is not None:
                             cols[i % 3].markdown(f"#️⃣ {tag}")
                 else:
                     st.write("Información de categorías no disponible")
+            
+            with tabs_info[4]:
+                if len(df) > 0:
+                    st.write("### Análisis de Sentimiento vs Rating")
+                    
+                    # Calcular sentimiento si no existe
+                    if 'sentiment_score' not in df.columns:
+                        analyzer = SentimentIntensityAnalyzer()
+                        df['sentiment_score'] = df['content'].apply(
+                            lambda x: analyzer.polarity_scores(str(x))['compound']
+                        )
+                    
+                    # Gráfico de densidad
+                    fig = plt.figure(figsize=(10, 6))
+                    sns.kdeplot(data=df, x='sentiment_score', y='score', cmap="Blues", fill=True)
+                    plt.title('Discrepancia entre Sentimiento y Rating')
+                    plt.xlabel('Puntuación de Sentimiento (VADER)')
+                    plt.ylabel('Rating de Usuario')
+                    plt.grid(True)
+                    st.pyplot(fig)
+                    
+                    # Estadísticas de correlación
+                    correlation = df['sentiment_score'].corr(df['score'])
+                    st.metric("Correlación Sentimiento-Rating", f"{correlation:.3f}")
+                    
+                    # Tabla de discrepancias
+                    st.write("### Mayores Discrepancias")
+                    df['discrepancia'] = abs(df['sentiment_score'] - (df['score']/5))
+                    discrepancias = df.nlargest(5, 'discrepancia')[
+                        ['content', 'score', 'sentiment_score', 'discrepancia']
+                    ].rename(columns={
+                        'content': 'Comentario',
+                        'score': 'Rating',
+                        'sentiment_score': 'Sentimiento',
+                        'discrepancia': 'Discrepancia'
+                    })
+                    st.dataframe(discrepancias.style.format({
+                        'Rating': '{:.1f}',
+                        'Sentimiento': '{:.3f}',
+                        'Discrepancia': '{:.3f}'
+                    }))
             
             # Métricas de crecimiento
             st.write("### Métricas de Crecimiento")
