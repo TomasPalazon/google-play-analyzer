@@ -1024,9 +1024,9 @@ if st.session_state.df is not None:
                     
                     # Mostrar métricas en formato de tabla
                     metrics_df = pd.DataFrame({
-                        'Precisión': [report[label]['precision'] for label in ['Negativo', 'Neutral', 'Positivo']],
-                        'Recall': [report[label]['recall'] for label in ['Negativo', 'Neutral', 'Positivo']],
-                        'F1-Score': [report[label]['f1-score'] for label in ['Negativo', 'Neutral', 'Positivo']]
+                        'Precisión': [report[str(i)]['precision'] for i in range(3)],
+                        'Recall': [report[str(i)]['recall'] for i in range(3)],
+                        'F1-Score': [report[str(i)]['f1-score'] for i in range(3)]
                     }, index=['Negativo', 'Neutral', 'Positivo'])
                     
                     st.dataframe(metrics_df.style.format("{:.3f}"))
@@ -1034,7 +1034,7 @@ if st.session_state.df is not None:
                     # Matriz de confusión
                     cm = confusion_matrix(y_test, y_pred_svm)
                     fig, ax = plt.subplots(figsize=(8, 6))
-                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    sns.heatmap(cm, annot=True, fmt='d', cmap="Blues",
                               xticklabels=['Negativo', 'Neutral', 'Positivo'],
                               yticklabels=['Negativo', 'Neutral', 'Positivo'])
                     plt.title('Matriz de Confusión - SVM')
@@ -1064,9 +1064,9 @@ if st.session_state.df is not None:
                     
                     # Mostrar métricas en formato de tabla
                     metrics_df_rf = pd.DataFrame({
-                        'Precisión': [report_rf[label]['precision'] for label in ['Negativo', 'Neutral', 'Positivo']],
-                        'Recall': [report_rf[label]['recall'] for label in ['Negativo', 'Neutral', 'Positivo']],
-                        'F1-Score': [report_rf[label]['f1-score'] for label in ['Negativo', 'Neutral', 'Positivo']]
+                        'Precisión': [report_rf[str(i)]['precision'] for i in range(3)],
+                        'Recall': [report_rf[str(i)]['recall'] for i in range(3)],
+                        'F1-Score': [report_rf[str(i)]['f1-score'] for i in range(3)]
                     }, index=['Negativo', 'Neutral', 'Positivo'])
                     
                     st.dataframe(metrics_df_rf.style.format("{:.3f}"))
