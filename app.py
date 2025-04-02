@@ -1041,7 +1041,7 @@ if st.session_state.df is not None:
                     plt.xlabel('Predicción')
                     plt.ylabel('Real')
                     st.pyplot(fig)
-                
+
                 with col2:
                     st.write("### Modelo Random Forest")
                     
@@ -1076,11 +1076,29 @@ if st.session_state.df is not None:
                         'Característica': features,
                         'Importancia': rf_model.feature_importances_
                     }).sort_values('Importancia', ascending=False)
-                    
-                    fig, ax = plt.subplots(figsize=(8, 6))
+
+                    st.write("### Importancia de Características")
+                    fig, ax = plt.subplots(figsize=(10, 5))
                     sns.barplot(data=feature_importance, x='Importancia', y='Característica')
-                    plt.title('Importancia de Características - Random Forest')
+                    plt.title('Importancia de Características en la Predicción')
                     st.pyplot(fig)
+
+                    # Explicar las características más importantes
+                    st.write("### Interpretación del Modelo")
+                    st.write("""
+                    El modelo toma en cuenta varias características para hacer sus predicciones:
+                    
+                    1. **sentiment_score**: La puntuación de sentimiento de VADER (-1 a 1)
+                    2. **score_norm**: La puntuación que dio el usuario (0-5, normalizada)
+                    3. **text_length**: Longitud del comentario
+                    4. **word_count**: Número de palabras
+                    5. **likes_norm**: Número de likes (normalizado)
+                    
+                    El modelo aprende patrones complejos como:
+                    - Comentarios largos con sentiment_score negativo y pocas estrellas suelen ser quejas detalladas
+                    - Comentarios cortos con muchos likes y sentiment_score positivo suelen ser recomendaciones entusiastas
+                    - Comentarios de longitud media con puntuación neutral podrían ser sugerencias o feedback constructivo
+                    """)
                 
                 # Métricas adicionales
                 st.write("### Métricas Adicionales")
