@@ -122,7 +122,7 @@ def get_app_details(app_id):
         return None
 
 # Función para obtener comentarios
-def get_comments(app_id, count=50000):
+def get_comments(app_id, count=10000):
     try:
         comments = []
         progress_bar = st.progress(0)
@@ -271,7 +271,7 @@ sentiment_analyzer = update_vader_lexicon()
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     app_url = st.text_input("URL de la aplicación de Google Play")
-    num_comments = st.slider("Número de comentarios a analizar", 100, 50000, 1000, 100)
+    num_comments = st.slider("Número de comentarios a analizar", 100, 10000, 1000, 100)
 
     if st.button("Analizar"):
         if app_url:
@@ -767,16 +767,65 @@ if st.session_state.df is not None:
             if len(df) > 0:
                 # Definir categorías de temas comunes
                 temas_categorias = {
-                    'Rendimiento': ['lento', 'congela', 'lag', 'crash', 'cierra', 'freezes', 'cuelga', 'pesada', 'rendimiento'],
-                    'Publicidad': ['anuncios', 'ads', 'publicidad', 'propaganda', 'pop-up', 'popup'],
-                    'Interfaz': ['interfaz', 'diseño', 'ui', 'ux', 'usuario', 'menú', 'botones', 'navegación'],
-                    'Funcionalidad': ['funciona', 'feature', 'característica', 'opción', 'herramienta'],
-                    'Errores': ['error', 'bug', 'fallo', 'problema', 'no funciona', 'arreglen'],
-                    'Actualizaciones': ['actualización', 'update', 'versión', 'nueva versión'],
-                    'Contenido': ['contenido', 'información', 'datos', 'material'],
-                    'Precio': ['precio', 'pago', 'gratis', 'premium', 'compra', 'costo'],
-                    'Soporte': ['soporte', 'ayuda', 'atención', 'respuesta', 'servicio'],
-                    'Permisos': ['permiso', 'acceso', 'privacidad', 'datos personales']
+                    'Rendimiento': [
+                        'lento', 'congela', 'lag', 'crash', 'cierra', 'freezes', 'cuelga', 'pesada', 'rendimiento',
+                        'fps', 'slow', 'loading', 'stuck', 'frozen', 'performance', 'sluggish', 'heavy', 'memory',
+                        'ram', 'cpu', 'batería', 'battery', 'drain', 'optimization', 'optimización', 'frame rate',
+                        'stuttering', 'stutters', 'laggy', 'responsive', 'unresponsive'
+                    ],
+                    'Publicidad': [
+                        'anuncios', 'ads', 'publicidad', 'propaganda', 'pop-up', 'popup', 'advertisement',
+                        'advertising', 'commercial', 'spam', 'sponsored', 'promoción', 'banner', 'invasive',
+                        'invasiva', 'molesta', 'annoying', 'intrusive', 'ad-free', 'sin anuncios'
+                    ],
+                    'Interfaz': [
+                        'interfaz', 'diseño', 'ui', 'ux', 'usuario', 'menú', 'botones', 'navegación',
+                        'layout', 'design', 'user interface', 'user experience', 'usability', 'usabilidad',
+                        'intuitivo', 'intuitive', 'clean', 'limpio', 'modern', 'moderno', 'aesthetic',
+                        'estética', 'visual', 'responsive', 'theme', 'tema', 'dark mode', 'modo oscuro',
+                        'accesible', 'accessible', 'user-friendly'
+                    ],
+                    'Funcionalidad': [
+                        'funciona', 'feature', 'característica', 'opción', 'herramienta', 'functionality',
+                        'function', 'tool', 'works', 'working', 'feature request', 'capability', 'capacidad',
+                        'customization', 'personalización', 'settings', 'configuración', 'ajustes', 'options',
+                        'powerful', 'potente', 'flexible', 'versatile', 'versátil', 'robust', 'robusto'
+                    ],
+                    'Errores': [
+                        'error', 'bug', 'fallo', 'problema', 'no funciona', 'arreglen', 'issue', 'glitch',
+                        'broken', 'roto', 'fix', 'arreglo', 'solution', 'solución', 'patch', 'parche',
+                        'debug', 'debugging', 'defecto', 'defect', 'mal funcionamiento', 'malfunction',
+                        'technical issue', 'problema técnico', 'not working'
+                    ],
+                    'Actualizaciones': [
+                        'actualización', 'update', 'versión', 'nueva versión', 'upgrade', 'patch',
+                        'release', 'latest', 'newest', 'recent', 'changelog', 'cambios', 'improvements',
+                        'mejoras', 'features', 'novedades', 'rollback', 'downgrade', 'rollout', 'beta'
+                    ],
+                    'Contenido': [
+                        'contenido', 'información', 'datos', 'material', 'content', 'info', 'data',
+                        'resources', 'recursos', 'quality', 'calidad', 'quantity', 'cantidad', 'variety',
+                        'variedad', 'media', 'multimedia', 'files', 'archivos', 'documents', 'documentos',
+                        'library', 'biblioteca', 'collection', 'colección'
+                    ],
+                    'Precio': [
+                        'precio', 'pago', 'gratis', 'premium', 'compra', 'costo', 'price', 'payment',
+                        'free', 'paid', 'subscription', 'suscripción', 'monthly', 'mensual', 'yearly',
+                        'anual', 'trial', 'prueba', 'value', 'valor', 'worth', 'vale la pena', 'expensive',
+                        'caro', 'cheap', 'barato', 'affordable', 'asequible'
+                    ],
+                    'Soporte': [
+                        'soporte', 'ayuda', 'atención', 'respuesta', 'servicio', 'support', 'help',
+                        'assistance', 'customer service', 'servicio al cliente', 'feedback', 'response',
+                        'contact', 'contacto', 'ticket', 'chat', 'email', 'correo', 'communication',
+                        'comunicación', 'responsive', 'quick', 'rápido', 'slow', 'lento'
+                    ],
+                    'Permisos': [
+                        'permiso', 'acceso', 'privacidad', 'datos personales', 'permission', 'access',
+                        'privacy', 'personal data', 'security', 'seguridad', 'tracking', 'seguimiento',
+                        'collection', 'recolección', 'consent', 'consentimiento', 'gdpr', 'policy',
+                        'política', 'terms', 'términos', 'conditions', 'condiciones'
+                    ]
                 }
                 
                 # Función para clasificar comentarios
