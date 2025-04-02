@@ -23,6 +23,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 import sklearn
+from sklearn.preprocessing import StandardScaler
 
 # Descargar recursos de NLTK necesarios
 import nltk
@@ -966,19 +967,34 @@ if st.session_state.df is not None:
             
             if len(df) > 0:
                 # Preparar datos para el modelo
-                features = ['sentiment_score']
+                # Crear más características para el modelo
+                df['text_length'] = df['content'].str.len()
+                df['word_count'] = df['content'].str.split().str.len()
+                df['sentiment_class'] = df['sentiment'].map({'Negativo': 0, 'Neutral': 1, 'Positivo': 2})
+                
+                features = [
+                    'sentiment_score',  # Puntuación de sentimiento VADER
+                    'text_length',      # Longitud del texto
+                    'word_count'        # Número de palabras
+                ]
+                
                 if 'score' in df.columns:
-                    df['score_norm'] = df['score'] / 5.0  # Normalizar scores
+                    df['score_norm'] = df['score'] / 5.0  # Normalizar puntuación del usuario
                     features.append('score_norm')
                 
-                # Crear etiquetas basadas en el score
-                df['sentiment_class'] = pd.qcut(df['sentiment_score'], 
-                                             q=3, 
-                                             labels=['Negativo', 'Neutral', 'Positivo'])
+                if 'thumbsUpCount' in df.columns:
+                    df['likes_norm'] = np.log1p(df['thumbsUpCount'])  # Normalizar likes con log
+                    features.append('likes_norm')
                 
-                # Preparar X e y
                 X = df[features]
                 y = df['sentiment_class']
+                
+                # Asegurarse de que no hay valores nulos
+                X = X.fillna(0)
+                
+                # Normalizar características
+                scaler = StandardScaler()
+                X = pd.DataFrame(scaler.fit_transform(X), columns=X.columns)
                 
                 # Dividir datos
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -989,8 +1005,15 @@ if st.session_state.df is not None:
                 with col1:
                     st.write("### Modelo SVM")
                     
-                    # Entrenar SVM
-                    svm_model = svm.SVC(kernel='rbf', probability=True)
+                    # Entrenar SVM con mejores parámetros
+                    svm_model = svm.SVC(
+                        kernel='rbf',
+                        C=1.0,
+                        gamma='scale',
+                        probability=True,
+                        class_weight='balanced',
+                        random_state=42
+                    )
                     svm_model.fit(X_train, y_train)
                     
                     # Predicciones
@@ -1022,8 +1045,15 @@ if st.session_state.df is not None:
                 with col2:
                     st.write("### Modelo Random Forest")
                     
-                    # Entrenar Random Forest
-                    rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+                    # Entrenar Random Forest con mejores parámetros
+                    rf_model = RandomForestClassifier(
+                        n_estimators=200,
+                        max_depth=10,
+                        min_samples_split=5,
+                        min_samples_leaf=2,
+                        class_weight='balanced',
+                        random_state=42
+                    )
                     rf_model.fit(X_train, y_train)
                     
                     # Predicciones
