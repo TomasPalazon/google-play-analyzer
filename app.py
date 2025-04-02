@@ -1106,15 +1106,20 @@ if st.session_state.df is not None:
                 # Encontrar comentarios con puntuación alta pero sentimiento negativo
                 contradictorios = df[
                     (df['score'] >= 4) & (df['sentiment_score'] < -0.2)
-                ][['content', 'score', 'sentiment_score', 'sentiment']].copy()
+                ].copy()  # Usar copy() del DataFrame completo
                 
                 if len(contradictorios) > 0:
                     st.write("#### Comentarios con puntuación alta (4-5) pero sentimiento negativo:")
                     
-                    # Predecir estos casos con ambos modelos
-                    X_contra = scaler.transform(contradictorios[features])
-                    contradictorios['Predicción SVM'] = svm_model.predict(X_contra)
-                    contradictorios['Predicción RF'] = rf_model.predict(X_contra)
+                    # Asegurarnos de que tenemos todas las características necesarias
+                    X_contra = contradictorios[features].copy()
+                    
+                    # Normalizar las características
+                    X_contra_scaled = scaler.transform(X_contra)
+                    
+                    # Hacer predicciones
+                    contradictorios['Predicción SVM'] = svm_model.predict(X_contra_scaled)
+                    contradictorios['Predicción RF'] = rf_model.predict(X_contra_scaled)
                     
                     # Mapear predicciones numéricas a texto
                     sentiment_map = {0: 'Negativo', 1: 'Neutral', 2: 'Positivo'}
@@ -1127,6 +1132,10 @@ if st.session_state.df is not None:
                             st.write(f"**Texto**: {row['content']}")
                             st.write(f"**Score del usuario**: {row['score']}/5")
                             st.write(f"**Sentiment score**: {row['sentiment_score']:.2f}")
+                            st.write(f"**Longitud del texto**: {row['text_length']} caracteres")
+                            st.write(f"**Número de palabras**: {row['word_count']} palabras")
+                            if 'thumbsUpCount' in row:
+                                st.write(f"**Likes**: {row['thumbsUpCount']}")
                             st.write(f"**Predicción SVM**: {row['Predicción SVM']}")
                             st.write(f"**Predicción RF**: {row['Predicción RF']}")
                 else:
