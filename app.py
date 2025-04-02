@@ -271,7 +271,7 @@ sentiment_analyzer = update_vader_lexicon()
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     app_url = st.text_input("URL de la aplicación de Google Play")
-    num_comments = st.slider("Número de comentarios a analizar", 100, 10000, 1000, 100)
+    num_comments = st.slider("Número de comentarios a analizar", 100, 50000, 1000, 100)
 
     if st.button("Analizar"):
         if app_url:
@@ -799,14 +799,26 @@ if st.session_state.df is not None:
                 # Contar frecuencia de temas
                 tema_counts = pd.Series(todos_temas).value_counts()
                 
-                # Visualizar distribución de temas
-                fig, ax = plt.subplots(figsize=(12, 6))
-                tema_counts.plot(kind='bar')
-                plt.title('Distribución de Temas en Comentarios')
-                plt.xlabel('Tema')
-                plt.ylabel('Número de Comentarios')
-                plt.xticks(rotation=45)
-                st.pyplot(fig)
+                # Filtrar la categoría "Otros" para la visualización
+                tema_counts_sin_otros = tema_counts[tema_counts.index != "Otros"]
+                
+                # Visualizar distribución de temas (excluyendo "Otros")
+                if not tema_counts_sin_otros.empty:
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    tema_counts_sin_otros.plot(kind='bar')
+                    plt.title('Distribución de Temas en Comentarios (excluyendo Otros)')
+                    plt.xlabel('Tema')
+                    plt.ylabel('Número de Comentarios')
+                    plt.xticks(rotation=45)
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                
+                # Mostrar estadísticas completas incluyendo "Otros"
+                st.write("### Distribución completa de temas:")
+                total_comentarios = tema_counts.sum()
+                for tema, count in tema_counts.items():
+                    percentage = (count / total_comentarios) * 100
+                    st.write(f"- {tema}: {count} comentarios ({percentage:.1f}%)")
                 
                 # Mostrar ejemplos de cada tema
                 st.write("### Ejemplos de Comentarios por Tema")
