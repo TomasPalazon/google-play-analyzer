@@ -1100,6 +1100,38 @@ if st.session_state.df is not None:
                     - Comentarios de longitud media con puntuación neutral podrían ser sugerencias o feedback constructivo
                     """)
                 
+                # Análisis de casos contradictorios
+                st.write("### Análisis de Casos Contradictorios")
+                
+                # Encontrar comentarios con puntuación alta pero sentimiento negativo
+                contradictorios = df[
+                    (df['score'] >= 4) & (df['sentiment_score'] < -0.2)
+                ][['content', 'score', 'sentiment_score', 'sentiment']].copy()
+                
+                if len(contradictorios) > 0:
+                    st.write("#### Comentarios con puntuación alta (4-5) pero sentimiento negativo:")
+                    
+                    # Predecir estos casos con ambos modelos
+                    X_contra = scaler.transform(contradictorios[features])
+                    contradictorios['Predicción SVM'] = svm_model.predict(X_contra)
+                    contradictorios['Predicción RF'] = rf_model.predict(X_contra)
+                    
+                    # Mapear predicciones numéricas a texto
+                    sentiment_map = {0: 'Negativo', 1: 'Neutral', 2: 'Positivo'}
+                    contradictorios['Predicción SVM'] = contradictorios['Predicción SVM'].map(sentiment_map)
+                    contradictorios['Predicción RF'] = contradictorios['Predicción RF'].map(sentiment_map)
+                    
+                    # Mostrar ejemplos
+                    for idx, row in contradictorios.head(5).iterrows():
+                        with st.expander(f"Comentario (Score: {row['score']}, Sentiment: {row['sentiment_score']:.2f})"):
+                            st.write(f"**Texto**: {row['content']}")
+                            st.write(f"**Score del usuario**: {row['score']}/5")
+                            st.write(f"**Sentiment score**: {row['sentiment_score']:.2f}")
+                            st.write(f"**Predicción SVM**: {row['Predicción SVM']}")
+                            st.write(f"**Predicción RF**: {row['Predicción RF']}")
+                else:
+                    st.write("No se encontraron casos contradictorios en este conjunto de datos.")
+                
                 # Métricas adicionales
                 st.write("### Métricas Adicionales")
                 col1, col2, col3 = st.columns(3)
