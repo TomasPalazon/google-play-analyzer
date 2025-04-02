@@ -122,16 +122,36 @@ def get_app_details(app_id):
         return None
 
 # Función para obtener comentarios
-def get_comments(app_id, count=100):
+def get_comments(app_id, count=50000):
     try:
-        result, _ = reviews(
-            app_id,
-            lang='en',
-            country='US',
-            sort=Sort.NEWEST,
-            count=count
-        )
-        return pd.DataFrame(result)
+        comments = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Calcular número de iteraciones necesarias
+        batch_size = 200  # Google Play Scraper obtiene comentarios en lotes
+        iterations = (count + batch_size - 1) // batch_size
+        
+        for i in range(iterations):
+            status_text.text(f'Obteniendo comentarios: {min((i+1)*batch_size, count)}/{count}')
+            result, continuation_token = reviews(
+                app_id,
+                lang='en',
+                country='US',
+                sort=Sort.NEWEST,
+                count=min(batch_size, count - len(comments)),
+                continuation_token=None if i == 0 else continuation_token
+            )
+            comments.extend(result)
+            progress = min((i + 1) * batch_size, count) / count
+            progress_bar.progress(progress)
+            
+            if not continuation_token or len(comments) >= count:
+                break
+                
+        status_text.empty()
+        progress_bar.empty()
+        return pd.DataFrame(comments)
     except Exception as e:
         st.error(f"Error al obtener comentarios: {str(e)}")
         return None
@@ -400,26 +420,17 @@ if st.session_state.df is not None:
                     st.write("Historial de cambios no disponible")
             
             with tabs_info[2]:
-                if 'permissions' in app_details:
+                if 'permissions' in app_details and app_details['permissions']:
                     permisos = app_details['permissions']
                     st.write(f"Total de permisos requeridos: {len(permisos)}")
                     
-                    # Agrupar permisos por categoría
-                    categorias_permisos = {}
-                    for permiso in permisos:
-                        categoria = permiso.split('.')[2] if len(permiso.split('.')) > 2 else "OTROS"
-                        if categoria not in categorias_permisos:
-                            categorias_permisos[categoria] = []
-                        categorias_permisos[categoria].append(permiso)
-                    
-                    # Mostrar permisos por categoría
-                    for categoria, permisos_list in sorted(categorias_permisos.items()):
-                        with st.expander(f"{categoria} ({len(permisos_list)})"):
-                            for permiso in sorted(permisos_list):
-                                st.write(f"- {permiso}")
+                    # Mostrar permisos en una tabla organizada
+                    permisos_df = pd.DataFrame(permisos)
+                    if not permisos_df.empty:
+                        st.dataframe(permisos_df, use_container_width=True)
                 else:
-                    st.write("Información de permisos no disponible")
-            
+                    st.info("No hay información de permisos disponible para esta aplicación")
+
             with tabs_info[3]:
                 if 'categories' in app_details and app_details['categories']:
                     st.write("#### Categorías")
